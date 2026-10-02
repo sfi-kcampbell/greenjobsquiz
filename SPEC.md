@@ -44,7 +44,7 @@ This is a greenfield project in this repo.
 | Concern | Choice |
 |---|---|
 | Framework | **Next.js (App Router) + TypeScript (strict)** on Vercel |
-| Database | **Neon Postgres** via `@neondatabase/serverless`. Use the pooled connection string at runtime and the direct one for migrations |
+| Database | **Neon Postgres** via `node-postgres` (`pg`) with Vercel's `attachDatabasePool`. The pooled connection string is used at runtime and the direct one for migrations. `pg` instead of Neon's HTTP driver gives real interactive transactions and lets local dev and tests use plain Postgres |
 | ORM / migrations | **Drizzle ORM + drizzle-kit**. Migrations are checked into the repo and run in the Vercel build step |
 | Staff auth | **Auth.js (NextAuth v5)**, using email magic links sent through Resend, with sessions stored in the database *(open decision: alternatively Google sign-in)* |
 | Validation | **Zod** at every API and server-action boundary |
