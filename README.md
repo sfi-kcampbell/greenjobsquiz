@@ -15,6 +15,15 @@ Phase 0 (skeleton) is done: database schema and migrations, staff sign-in, Super
 
 Anyone else is refused at sign-in. Disabling or removing an Admin signs them out immediately.
 
+## Temporary PIN sign-in
+
+Until Resend is configured, staff can sign in with their email plus a shared PIN:
+
+1. In Vercel, set `SECRET_PIN` (at least 6 characters; longer is better) and redeploy.
+2. On `/sign-in`, use the **Sign in with PIN** card. The email must still be a Super Admin or an active Admin.
+
+PIN sessions last 12 hours. Attempts are limited to 5 per 15 minutes per IP address and 30 per 15 minutes overall. **Delete `SECRET_PIN` and redeploy before launch**; the PIN option disappears as soon as the variable is gone.
+
 ## Local development
 
 Requires Node 22+ and a Postgres database (a Neon dev branch, or local Postgres 16).

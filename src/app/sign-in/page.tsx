@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getStaff } from "@/lib/auth/access";
+import { pinSignInEnabled } from "@/lib/auth/pin-check";
+import { PinForm } from "./pin-form";
 import { SignInForm } from "./sign-in-form";
 
 export const metadata: Metadata = { title: "Staff sign-in", robots: { index: false } };
@@ -31,6 +33,23 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
         </p>
       )}
       <SignInForm defaultEmail={email} />
+      {pinSignInEnabled() && (
+        <section
+          aria-labelledby="pin-heading"
+          className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4"
+        >
+          <div>
+            <h2 id="pin-heading" className="font-semibold">
+              Sign in with PIN
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Temporary, while email sign-in is being set up. Use your staff email and the shared
+              PIN.
+            </p>
+          </div>
+          <PinForm />
+        </section>
+      )}
     </main>
   );
 }
