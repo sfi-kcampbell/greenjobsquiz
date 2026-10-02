@@ -40,7 +40,7 @@ Open http://localhost:3000/admin and sign in with an email from `SUPER_ADMINS`. 
 
 ## Deploying to Vercel
 
-1. Import the repo into Vercel (framework preset: Next.js).
+1. Import the repo into Vercel. `vercel.json` pins the framework to Next.js. In **Settings → Build and Deployment**, leave the Output Directory override off (an override set to `public` causes "No Output Directory named public").
 2. Add the **Neon** integration from the Vercel Marketplace. It sets `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, and can create a database branch for each preview deployment.
 3. Set `AUTH_SECRET`, `SUPER_ADMINS`, `APP_URL`, `AUTH_RESEND_KEY` and `EMAIL_FROM` for Production (and Preview if you use it).
 4. In Resend, verify the domain used in `EMAIL_FROM`.
