@@ -1,8 +1,7 @@
 import "server-only";
 import { attachDatabasePool } from "@vercel/functions";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import * as schema from "./schema";
+import { createDb } from "./create";
 
 /**
  * One pg Pool per server instance, against Neon's pooled connection string.
@@ -28,5 +27,5 @@ if (process.env.NODE_ENV !== "production") {
 // Lets Vercel Fluid compute close idle clients before suspending a function.
 attachDatabasePool(pool);
 
-export const db = drizzle(pool, { schema, casing: "snake_case" });
-export type Db = typeof db;
+export const db = createDb(pool);
+export type { Database as Db } from "./create";

@@ -6,7 +6,10 @@ A personality-style quiz that recommends a green job type. The full product and 
 
 ## Status
 
-Phase 0 (skeleton) is done: database schema and migrations, staff sign-in, Super Admin / Admin roles, the admin shell and the Staff screen. See the build order in SPEC.md for what comes next.
+- **Phase 0** (skeleton): database schema and migrations, staff sign-in, Super Admin / Admin roles, the admin shell and the Staff screen.
+- **Phase 1** (Categories): the quiz list, quiz settings, the builder shell, and the Categories tab (add, edit, reorder, delete, suggested set).
+
+See the build order in SPEC.md for what comes next.
 
 ## Roles
 
@@ -35,13 +38,16 @@ npm run db:migrate
 npm run dev
 ```
 
+Integration tests need a **separate, throwaway** Postgres database in `TEST_DATABASE_URL`. Every table in it is emptied between tests.
+
 Open http://localhost:3000/admin and sign in with an email from `SUPER_ADMINS`. Without `AUTH_RESEND_KEY`, the sign-in link is printed in the terminal running `npm run dev`.
 
 | Script | What it does |
 |---|---|
 | `npm run dev` | Dev server |
 | `npm run build` | Applies migrations, then builds (this is what Vercel runs) |
-| `npm test` | Unit tests (Vitest) |
+| `npm test` | Unit tests, plus integration tests when `TEST_DATABASE_URL` is set |
+| `npm run test:int` | Integration tests only (needs `TEST_DATABASE_URL`) |
 | `npm run typecheck` | Generates route types and runs `tsc` |
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Creates a migration after editing `src/lib/db/schema.ts` |
