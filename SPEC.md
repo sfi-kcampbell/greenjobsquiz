@@ -3,14 +3,14 @@
 ## Context
 
 The product is called a "Quiz" but it's really a personality test: *answer these questions and
-we'll recommend a Job Type*. For PLT/SFI the job types are roles such as Forester, Wildlife
+we'll recommend a Response*. For PLT/SFI the responses are green careers such as Forester, Wildlife
 Biologist, Park Ranger and Environmental Educator.
 
 **Staff** (Super Admins and Admins) build quizzes. For each one they:
 - define scoring categories,
 - write questions and answers,
 - weight each answer against those categories,
-- write job-type results, weighted against the same categories.
+- write responses (the outcomes a quiz can recommend), weighted against the same categories.
 
 Answer and result content is rich text and must render well.
 
@@ -36,7 +36,8 @@ This is a greenfield project in this repo.
 | API | A full public REST API from day one. The hosted page and the embed are clients of it |
 | Reporting | Submissions list, detail view, CSV export |
 | Headless | The hosted URL **302-redirects** to a per-quiz external base URL |
-| Job Type pages | Not publicly browsable in v1 |
+| Naming | Outcomes are called **Responses** (generic); the PLT quiz's responses are green careers such as Forester |
+| Response pages | Not publicly browsable in v1 |
 | Build | Full scope, in phases that can each be tested on their own |
 
 ### Stack
@@ -70,7 +71,7 @@ This is a greenfield project in this repo.
   - see Submissions, the detail view and CSV export,
   - change Settings.
 - **Admin**: a row in `staff_users` with `role = 'admin'`, invited by a Super Admin. Admins can
-  create, edit, publish and unpublish quizzes, categories, questions, answers and job types. They
+  create, edit, publish and unpublish quizzes, categories, questions, answers and responses. They
   can also run Simulate and Health.
 - Admins **can't** see Submissions or Settings, and can't manage staff. The reason is that
   submissions hold respondent emails and hashed IPs. *(Confirm this split; it's one flag to change.)*
@@ -92,7 +93,7 @@ This is a greenfield project in this repo.
 | `categories` | id, quiz_id → quizzes (cascade), name, abbr (≤6 chars), color, importance numeric (0–5, default 1.0), description, position |
 | `questions` | id, quiz_id (cascade), title (plain text), help_html, type (`single`/`multi`), min_select, max_select, required, split_multi (default false), image_url, position |
 | `answers` | id, question_id (cascade), label (plain text, required), body_html (optional), image_url, position |
-| `results` (Job Types) | id, quiz_id (cascade), title, body_html, excerpt, image_url, cta_url, cta_label, position |
+| `results` (Responses) | id, quiz_id (cascade), title, body_html, excerpt, image_url, cta_url, cta_label, position |
 | `answer_weights` | (answer_id, category_id) PK, weight numeric(4,2). Both foreign keys cascade |
 | `result_weights` | (result_id, category_id) PK, weight numeric(4,2). Both foreign keys cascade |
 | `staff_users` | id, email (unique, lowercased), name, role (`admin`), invited_by, disabled_at, created_at |
@@ -208,7 +209,7 @@ Vector keys are always category IDs.
 
 ### Cosine plus two normalizations
 
-**Why not a plain weighted sum:** it has a result-side magnitude bias. A "generalist" job type that
+**Why not a plain weighted sum:** it has a result-side magnitude bias. A "generalist" response that
 is weighted high in every category beats every specialist. Cosine measures the *shape* of the
 profile instead. Its range is [−1, 1], and a negative value genuinely means a poor fit.
 
@@ -425,7 +426,7 @@ created is flagged `suspect`, never rejected.
 
 ### Navigation
 
-Quizzes · Job Types (filtered by quiz) · Submissions (Super Admin) · Staff (Super Admin) · Settings
+Quizzes · Responses (filtered by quiz) · Submissions (Super Admin) · Staff (Super Admin) · Settings
 (Super Admin).
 
 The quiz list shows status (Draft/Published), a **Publish/Unpublish** toggle, **Open Builder**, and
@@ -440,7 +441,7 @@ The quiz list shows status (Draft/Published), a **Publish/Unpublish** toggle, **
 
 ### Builder: one screen, saved per item
 
-`/admin/quizzes/{id}/builder` has tabs: **Categories | Questions | Job Types | Simulate | Health**.
+`/admin/quizzes/{id}/builder` has tabs: **Categories | Questions | Responses | Simulate | Health**.
 
 - **Why not one page per question or answer:** a 30-question quiz would take about 180 page loads,
   and nobody could compare weights side by side.
@@ -457,7 +458,7 @@ warning fires while anything is dirty.
   and Policy & Advocacy.
 - Table columns: drag handle · Name · Abbr (defaults to the first 4 characters) · Color · Importance
   (0–5) · Used by · Delete.
-- Delete confirms with impact counts: "Outdoors is used by 14 answers and 5 job types."
+- Delete confirms with impact counts: "Outdoors is used by 14 answers and 5 responses."
 - Warn above 8 categories. Hard-stop at 15.
 
 ### Questions tab: accordion cards with a weight matrix
@@ -495,13 +496,13 @@ warning fires while anything is dirty.
 - **New answers** are created when the question is saved, not when they're added.
 - **Rich text** is stored as sanitized HTML, and image uploads go to **Vercel Blob**.
 
-### Job Types tab
+### Responses tab
 
 - **Matrix:** results × categories, sharing the matrix component with the Questions tab.
 - **Per-row helper:** "normalize to sum 10".
 - **Near-duplicate flag** on any pair of results with nearly identical vectors. Coin-flip matches
   are the top source of "wrong answer" complaints.
-- **Job type editor:** title, rich body, excerpt, image, CTA, and a Category Profile with live bars.
+- **Response editor:** title, rich body, excerpt, image, CTA, and a Category Profile with live bars.
 
 ### Simulate tab
 
@@ -532,7 +533,7 @@ warnings").
 ## Submissions and export (Super Admin)
 
 **List columns:** Attempt # · Date (newest first) · Quiz · Respondent (email if one was given,
-otherwise "Anonymous") · Matched Job Type · Score (with a bar) · Top Category · Answered (12/12) ·
+otherwise "Anonymous") · Matched Response · Score (with a bar) · Top Category · Answered (12/12) ·
 Time.
 
 **Actions:**
@@ -540,7 +541,7 @@ Time.
 - Bulk Delete and Export.
 - Server-side pagination and sorting, with the state kept in the URL.
 
-**Filters:** quiz, job type (limited to the chosen quiz), date range, and text search over email and
+**Filters:** quiz, response (limited to the chosen quiz), date range, and text search over email and
 result title.
 
 **Query safety:**
@@ -682,7 +683,7 @@ greenjobsquiz/
 │   │   ├── quizzes/[slug]/      hosted quiz page (+ index at quizzes/)
 │   │   ├── quiz-result/[token]/ printable result
 │   │   ├── embed/[slug]/        iframe embed page
-│   │   ├── admin/               dashboard, quizzes, builder, job types, submissions, staff, settings
+│   │   ├── admin/               dashboard, quizzes, builder, responses, submissions, staff, settings
 │   │   └── api/
 │   │       ├── v1/              public REST routes
 │   │       ├── admin/           simulate, report, export
@@ -714,7 +715,7 @@ greenjobsquiz/
 | **0** Skeleton | Next.js app, Neon + Drizzle schema and migrations, Auth.js magic link, `SUPER_ADMINS` parsing, admin shell, Staff screen, Vercel deploy | Super Admin can sign in; an invited Admin can sign in; a random email is rejected; Admins can't see Submissions or Staff |
 | **1** Categories | CRUD, reorder, suggested set | Add, rename, reorder and delete; deleting cascades the weights |
 | **2** Questions and answers | Accordion, matrix, Tiptap drawers, lazy answers, two-level dnd, dirty state | Build a 10-question quiz; drag a question and its editor still works |
-| **3** Job Types | Editor, profile bars, matrix, near-duplicate flag | Write 5 distinct job types |
+| **3** Responses | Editor, profile bars, matrix, near-duplicate flag | Write 5 distinct responses |
 | **4** Scoring | Pure engine, Vitest suite, Simulate, Health | **Milestone:** the model can be tuned with no frontend. Get sign-off here |
 | **5** Public API | Tokens, sessions, all `/api/v1` routes, publish gating | **Milestone:** the whole flow works with curl; drafts return 404 |
 | **6** Frontend happy path | Hosted page, single-select through to the result | First demo |
@@ -730,7 +731,7 @@ greenjobsquiz/
 ## End-to-end verification
 
 1. **Scoring tests:** `npm test` (Vitest) passes.
-2. **Build:** a Super Admin builds a 10-question, 6-category, 5-job-type quiz. An Admin edits it.
+2. **Build:** a Super Admin builds a 10-question, 6-category, 5-response quiz. An Admin edits it.
    The Admin can't open Submissions.
 3. **Tune and publish:** Simulate gives a sensible ranking and Health is clean. Before publishing
    the public URL returns 404; after publishing it loads.

@@ -157,6 +157,9 @@ export const categories = pgTable(
   },
   (t) => [
     index("categories_quiz_position").on(t.quizId, t.position),
+    // Names and abbreviations are matrix headers, so they must be unique per quiz.
+    uniqueIndex("categories_quiz_name_ci").on(t.quizId, sql`lower(${t.name})`),
+    uniqueIndex("categories_quiz_abbr_ci").on(t.quizId, sql`lower(${t.abbr})`),
     check("categories_abbr_length", sql`char_length(${t.abbr}) between 1 and 6`),
     check("categories_importance_range", sql`${t.importance} between 0 and 5`),
   ],
@@ -199,7 +202,7 @@ export const answers = pgTable(
   (t) => [index("answers_question_position").on(t.questionId, t.position)],
 );
 
-/** Job Types. */
+/** Responses: the outcomes a quiz can recommend (e.g. Forester). */
 export const results = pgTable(
   "results",
   {

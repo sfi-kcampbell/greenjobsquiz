@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "categories_quiz_name_ci" ON "categories" USING btree ("quiz_id",lower("name"));--> statement-breakpoint
+CREATE UNIQUE INDEX "categories_quiz_abbr_ci" ON "categories" USING btree ("quiz_id",lower("abbr"));
