@@ -1,6 +1,6 @@
 # PLT Green Jobs Quiz
 
-A personality-style quiz that recommends a green job type. The full product and technical spec is in [SPEC.md](SPEC.md).
+A personality-style quiz that recommends a response, such as a green career. The full product and technical spec is in [SPEC.md](SPEC.md).
 
 **Stack:** Next.js 16 (App Router, TypeScript) on Vercel · Neon Postgres · Drizzle ORM · Auth.js magic-link sign-in via Resend.
 

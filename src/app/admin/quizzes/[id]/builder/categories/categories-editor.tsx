@@ -105,7 +105,7 @@ function merge(
 function usageText(row: Row): string {
   if (row.id === null) return "Not saved yet";
   const a = `${row.answerCount} answer${row.answerCount === 1 ? "" : "s"}`;
-  const r = `${row.resultCount} job type${row.resultCount === 1 ? "" : "s"}`;
+  const r = `${row.resultCount} response${row.resultCount === 1 ? "" : "s"}`;
   return `${a} · ${r}`;
 }
 

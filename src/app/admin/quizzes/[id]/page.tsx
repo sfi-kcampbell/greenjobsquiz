@@ -43,7 +43,7 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
           Delete quiz
         </h2>
         <p className="text-sm text-muted">
-          Deletes the quiz with all its categories, questions and job types. Quizzes with submissions
+          Deletes the quiz with all its categories, questions and responses. Quizzes with submissions
           can&apos;t be deleted.
         </p>
         <DeleteQuizForm quizId={quiz.id} title={quiz.title} />

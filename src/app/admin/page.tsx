@@ -15,7 +15,7 @@ export default async function AdminDashboard() {
           <Link href="/admin/quizzes" className="font-medium text-brand">
             Quizzes
           </Link>
-          <p className="mt-1 text-sm text-muted">Build quizzes, questions and job types.</p>
+          <p className="mt-1 text-sm text-muted">Build quizzes, questions and responses.</p>
         </li>
         {staff.role === "super_admin" && (
           <li className="rounded-lg border border-border bg-surface p-4">

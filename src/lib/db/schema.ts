@@ -202,7 +202,7 @@ export const answers = pgTable(
   (t) => [index("answers_question_position").on(t.questionId, t.position)],
 );
 
-/** Job Types. */
+/** Responses: the outcomes a quiz can recommend (e.g. Forester). */
 export const results = pgTable(
   "results",
   {

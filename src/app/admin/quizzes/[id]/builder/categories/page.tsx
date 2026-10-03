@@ -17,7 +17,7 @@ export default async function CategoriesPage({ params }: PageProps<"/admin/quizz
           Categories
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-muted">
-          Categories are the traits answers and job types are scored on. Every answer and job type
+          Categories are the traits answers and responses are scored on. Every answer and response
           gets a weight from −5 (strongly against) to +5 (strongly for) in each category.
           Importance multiplies a category&apos;s effect on the score.
         </p>
