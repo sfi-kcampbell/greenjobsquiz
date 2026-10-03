@@ -33,3 +33,43 @@ body {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
+
+/* Authored rich text (editor and rendered output). */
+.rich-text > * + * {
+  margin-top: 0.5em;
+}
+.rich-text ul {
+  list-style: disc;
+  padding-left: 1.5em;
+}
+.rich-text ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.rich-text a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+.rich-text blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.75em;
+  color: var(--muted);
+}
+.rich-text h3 {
+  font-size: 1.125em;
+  font-weight: 600;
+}
+.rich-text h4 {
+  font-weight: 600;
+}
+
+/* Weight matrix: hide number spinners so cells stay compact. */
+.weight-cell::-webkit-outer-spin-button,
+.weight-cell::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.weight-cell {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

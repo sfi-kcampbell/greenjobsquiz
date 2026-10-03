@@ -1,24 +1,11 @@
 "use client";
 
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type Announcements,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { closestCenter, DndContext, type Announcements, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useId, useRef, useState } from "react";
+import { useLatest, useSortSensors, useUnsavedChangesWarning } from "@/components/builder/hooks";
+import { SaveAllBar } from "@/components/builder/save-all-bar";
 import type { CategoryView } from "@/lib/content/categories";
 import {
   ABBR_MAX,
@@ -119,26 +106,12 @@ export function CategoriesEditor({ quizId, initial }: { quizId: number; initial:
   // dnd-kit's generated ids differ between server and client unless given a stable one.
   const dndId = useId();
 
-  // Async handlers (Save all) need the latest rows, not the render's snapshot.
-  const rowsRef = useRef(rows);
-  useEffect(() => {
-    rowsRef.current = rows;
-  }, [rows]);
+  const rowsRef = useLatest(rows);
 
   const dirtyCount = rows.filter((r) => r.dirty).length;
   const atLimit = rows.length >= MAX_CATEGORIES;
 
-  // Warn before leaving with unsaved changes.
-  const hasDirty = dirtyCount > 0;
-  useEffect(() => {
-    if (!hasDirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [hasDirty]);
+  useUnsavedChangesWarning(dirtyCount > 0);
 
   // Move focus to a newly added row's name field once it has rendered.
   const focusKey = useRef<string | null>(null);
@@ -261,10 +234,7 @@ export function CategoriesEditor({ quizId, initial }: { quizId: number; initial:
 
   /* ------------------------------ Reordering ------------------------------ */
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const sensors = useSortSensors();
 
   const nameOf = (key: string | number) => rowsRef.current.find((r) => r.key === key)?.name || "category";
   const positionOf = (key: string | number) => rowsRef.current.findIndex((r) => r.key === key) + 1;
@@ -409,25 +379,7 @@ export function CategoriesEditor({ quizId, initial }: { quizId: number; initial:
         </p>
       </div>
 
-      {dirtyCount > 0 && (
-        <div
-          role="region"
-          aria-label="Unsaved changes"
-          className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand/40 bg-surface p-3 shadow-md"
-        >
-          <p className="text-sm font-medium">
-            Unsaved changes in {dirtyCount} {dirtyCount === 1 ? "category" : "categories"}
-          </p>
-          <button
-            type="button"
-            onClick={saveAll}
-            disabled={busy}
-            className="rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
-          >
-            {busy ? "Saving…" : "Save all"}
-          </button>
-        </div>
-      )}
+      <SaveAllBar count={dirtyCount} singular="category" plural="categories" busy={busy} onSaveAll={saveAll} />
     </div>
   );
 }
