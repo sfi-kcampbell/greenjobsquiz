@@ -107,6 +107,16 @@ export const CATEGORY_PALETTE = [
   "#5c6b2e",
 ] as const;
 
+/** Like fieldErrors, but keyed by the full path ("answers.2.label") for nested forms. */
+export function pathErrors(error: z.ZodError): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = issue.path.length ? issue.path.join(".") : "form";
+    out[key] ??= issue.message;
+  }
+  return out;
+}
+
 /** Flattens Zod issues into `{ field: firstMessage }` for inline form errors. */
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {};
@@ -116,3 +126,72 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+/* ------------------------------- Questions ------------------------------ */
+
+export const MAX_QUESTIONS = 100;
+export const MAX_ANSWERS = 12;
+export const WEIGHT_MIN = -5;
+export const WEIGHT_MAX = 5;
+const RICH_TEXT_MAX = 20_000;
+
+const richText = z
+  .string()
+  .max(RICH_TEXT_MAX, "This text is too long.")
+  .nullable()
+  .optional()
+  .transform((v) => v ?? null);
+
+const weight = z.coerce
+  .number({ error: `Weights must be numbers from ${WEIGHT_MIN} to ${WEIGHT_MAX}.` })
+  .min(WEIGHT_MIN, `Weights can't be below ${WEIGHT_MIN}.`)
+  .max(WEIGHT_MAX, `Weights can't be above ${WEIGHT_MAX}.`)
+  .transform((n) => Math.round(n * 100) / 100);
+
+export const answerInput = z.object({
+  /** Client-side key, echoed back so new rows learn their database id. */
+  key: z.string().min(1).max(64),
+  id: z.coerce.number().int().positive().nullable(),
+  label: z.string().trim().min(1, "Every answer needs a label.").max(200, "Keep answer labels under 200 characters."),
+  bodyHtml: richText,
+  /** categoryId → weight. Zeros are allowed here and dropped when saving. */
+  weights: z.record(z.string().regex(/^\d+$/), weight),
+});
+export type AnswerInput = z.infer<typeof answerInput>;
+
+export const questionInput = z
+  .object({
+    id: z.coerce.number().int().positive().nullable(),
+    title: z.string().trim().min(1, "Enter the question.").max(300, "Keep the question under 300 characters."),
+    helpHtml: richText,
+    type: z.enum(["single", "multi"]),
+    required: z.boolean(),
+    splitMulti: z.boolean(),
+    minSelect: z.coerce.number().int(),
+    maxSelect: z.coerce.number().int(),
+    answers: z.array(answerInput).max(MAX_ANSWERS, `A question can have at most ${MAX_ANSWERS} answers.`),
+  })
+  .transform((q) =>
+    q.type === "single" ? { ...q, minSelect: 1, maxSelect: 1, splitMulti: false } : q,
+  )
+  .superRefine((q, ctx) => {
+    const keys = new Set(q.answers.map((a) => a.key));
+    if (keys.size !== q.answers.length) {
+      ctx.addIssue({ code: "custom", path: ["answers"], message: "Duplicate answer rows." });
+    }
+    if (q.type !== "multi") return;
+    if (q.minSelect < 1) {
+      ctx.addIssue({ code: "custom", path: ["minSelect"], message: "Minimum must be at least 1." });
+    }
+    if (q.maxSelect < q.minSelect) {
+      ctx.addIssue({ code: "custom", path: ["maxSelect"], message: "Maximum can't be less than the minimum." });
+    }
+    if (q.answers.length > 0 && q.maxSelect > q.answers.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["maxSelect"],
+        message: `Maximum can't be more than the number of answers (${q.answers.length}).`,
+      });
+    }
+  });
+export type QuestionInput = z.infer<typeof questionInput>;
