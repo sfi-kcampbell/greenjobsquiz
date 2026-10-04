@@ -4,6 +4,7 @@ import {
   deriveAbbr,
   uniqueAbbr,
   fieldErrors,
+  questionInput,
   quizInput,
   slugify,
   SUGGESTED_CATEGORIES,
@@ -94,5 +95,58 @@ describe("SUGGESTED_CATEGORIES", () => {
     for (const c of SUGGESTED_CATEGORIES) expect(categoryInput.safeParse(c).success).toBe(true);
     expect(new Set(SUGGESTED_CATEGORIES.map((c) => c.name.toLowerCase())).size).toBe(6);
     expect(new Set(SUGGESTED_CATEGORIES.map((c) => c.abbr.toLowerCase())).size).toBe(6);
+  });
+});
+
+describe("questionInput", () => {
+  const answer = (key: string, weights: Record<string, number | string> = {}) => ({
+    key,
+    id: null,
+    label: `Answer ${key}`,
+    bodyHtml: null,
+    weights,
+  });
+  const base = {
+    id: null,
+    title: "How do you feel about rain?",
+    helpHtml: null,
+    type: "single" as const,
+    required: true,
+    splitMulti: true,
+    minSelect: 3,
+    maxSelect: 4,
+    answers: [answer("a"), answer("b")],
+  };
+
+  it("forces single questions to choose exactly one", () => {
+    const q = questionInput.parse(base);
+    expect([q.minSelect, q.maxSelect, q.splitMulti]).toEqual([1, 1, false]);
+  });
+
+  it("checks multi-select bounds", () => {
+    const multi = { ...base, type: "multi" as const, answers: [answer("a"), answer("b"), answer("c")] };
+    expect(questionInput.safeParse({ ...multi, minSelect: 1, maxSelect: 3 }).success).toBe(true);
+    const errs = (v: object) => {
+      const r = questionInput.safeParse({ ...multi, ...v });
+      return r.success ? {} : fieldErrors(r.error);
+    };
+    expect(errs({ minSelect: 0, maxSelect: 2 })).toHaveProperty("minSelect");
+    expect(errs({ minSelect: 2, maxSelect: 1 })).toHaveProperty("maxSelect");
+    expect(errs({ minSelect: 1, maxSelect: 4 }).maxSelect).toMatch(/number of answers \(3\)/);
+  });
+
+  it("validates and rounds weights", () => {
+    const q = questionInput.parse({ ...base, answers: [answer("a", { "3": "2.345", "4": -5 })] });
+    expect(q.answers[0].weights).toEqual({ "3": 2.35, "4": -5 });
+    expect(questionInput.safeParse({ ...base, answers: [answer("a", { "3": 6 })] }).success).toBe(false);
+    expect(questionInput.safeParse({ ...base, answers: [answer("a", { "3": "x" })] }).success).toBe(false);
+    expect(questionInput.safeParse({ ...base, answers: [answer("a", { cat: 1 })] }).success).toBe(false);
+  });
+
+  it("requires labels and limits answer count", () => {
+    expect(questionInput.safeParse({ ...base, answers: [{ ...answer("a"), label: "  " }] }).success).toBe(false);
+    const many = Array.from({ length: 13 }, (_, i) => answer(String(i)));
+    expect(questionInput.safeParse({ ...base, answers: many }).success).toBe(false);
+    expect(questionInput.safeParse({ ...base, answers: [answer("a"), answer("a")] }).success).toBe(false);
   });
 });
