@@ -195,3 +195,48 @@ export const questionInput = z
     }
   });
 export type QuestionInput = z.infer<typeof questionInput>;
+
+/* ------------------------------- Responses ------------------------------ */
+
+export const MAX_RESPONSES = 50;
+
+const responseWeights = z.record(z.string().regex(/^\d+$/), weight);
+
+export const responseRowInput = z.object({
+  id: z.coerce.number().int().positive().nullable(),
+  title: z.string().trim().min(1, "Enter a title.").max(120, "Keep the title under 120 characters."),
+  weights: responseWeights,
+});
+export type ResponseRowInput = z.infer<typeof responseRowInput>;
+
+export const responseDetailsInput = z
+  .object({
+    title: z.string().trim().min(1, "Enter a title.").max(120, "Keep the title under 120 characters."),
+    excerpt: z
+      .string()
+      .trim()
+      .max(300, "Keep the summary under 300 characters.")
+      .transform((v) => v || null),
+    bodyHtml: richText,
+    ctaUrl: z
+      .string()
+      .trim()
+      .max(2000)
+      .transform((v) => v || null)
+      .refine((v) => v === null || /^https?:\/\/[^\s]+$/i.test(v), "Enter a full web address starting with https://"),
+    ctaLabel: z
+      .string()
+      .trim()
+      .max(60, "Keep the button label under 60 characters.")
+      .transform((v) => v || null),
+    weights: responseWeights,
+  })
+  .superRefine((r, ctx) => {
+    if (r.ctaUrl && !r.ctaLabel) {
+      ctx.addIssue({ code: "custom", path: ["ctaLabel"], message: "Add a button label for the link." });
+    }
+    if (r.ctaLabel && !r.ctaUrl) {
+      ctx.addIssue({ code: "custom", path: ["ctaUrl"], message: "Add the web address the button links to." });
+    }
+  });
+export type ResponseDetailsInput = z.infer<typeof responseDetailsInput>;

@@ -3,9 +3,9 @@
  * between server views and editable cards.
  */
 import type { AnswerView, QuestionView } from "@/lib/content/questions";
-import { WEIGHT_MAX, WEIGHT_MIN } from "@/lib/content/validation";
+import { cellValue, type CategoryHeader } from "@/components/builder/weight-matrix";
 
-export type CategoryHeader = { id: number; name: string; abbr: string; color: string };
+export type { CategoryHeader };
 
 export type AnswerRow = {
   /** Stable key; never changes, so rich-text editors stay mounted across saves. */
@@ -40,15 +40,6 @@ export type Card = {
 
 let counter = 0;
 export const newKey = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${counter++}`;
-
-export function cellValue(text: string | undefined): number {
-  const n = Number.parseFloat(text ?? "");
-  return Number.isFinite(n) ? n : 0;
-}
-
-export function clampWeight(n: number): number {
-  return Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, n));
-}
 
 function answerFromServer(a: AnswerView, key: string, previous?: AnswerRow): AnswerRow {
   const cells: Record<number, string> = {};

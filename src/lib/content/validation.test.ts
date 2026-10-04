@@ -5,6 +5,7 @@ import {
   uniqueAbbr,
   fieldErrors,
   questionInput,
+  responseDetailsInput,
   quizInput,
   slugify,
   SUGGESTED_CATEGORIES,
@@ -148,5 +149,25 @@ describe("questionInput", () => {
     const many = Array.from({ length: 13 }, (_, i) => answer(String(i)));
     expect(questionInput.safeParse({ ...base, answers: many }).success).toBe(false);
     expect(questionInput.safeParse({ ...base, answers: [answer("a"), answer("a")] }).success).toBe(false);
+  });
+});
+
+describe("responseDetailsInput", () => {
+  const base = { title: "Forester", excerpt: "", bodyHtml: null, ctaUrl: "", ctaLabel: "", weights: { "1": 4 } };
+
+  it("accepts a minimal response and turns blanks into null", () => {
+    expect(responseDetailsInput.parse(base)).toMatchObject({ excerpt: null, ctaUrl: null, ctaLabel: null });
+  });
+  it("needs the CTA URL and label together", () => {
+    expect(responseDetailsInput.safeParse({ ...base, ctaUrl: "https://plt.org" }).success).toBe(false);
+    expect(responseDetailsInput.safeParse({ ...base, ctaLabel: "Learn more" }).success).toBe(false);
+    expect(
+      responseDetailsInput.safeParse({ ...base, ctaUrl: "https://plt.org/careers", ctaLabel: "Learn more" }).success,
+    ).toBe(true);
+  });
+  it("only allows http(s) links", () => {
+    for (const ctaUrl of ["javascript:alert(1)", "plt.org", "ftp://x.org", "data:text/html,x"]) {
+      expect(responseDetailsInput.safeParse({ ...base, ctaUrl, ctaLabel: "Go" }).success, ctaUrl).toBe(false);
+    }
   });
 });

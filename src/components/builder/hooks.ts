@@ -4,7 +4,13 @@ import { KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/c
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useEffect, useRef } from "react";
 
-/** Asks the browser to confirm leaving the page while `active` is true. */
+export const UNSAVED_MESSAGE = "You have unsaved changes. Leave this page and lose them?";
+
+/**
+ * While `active`, asks before leaving the page: on reload/close/typed URLs
+ * (beforeunload) and on in-app links, which navigate without a page load and
+ * so never fire beforeunload.
+ */
 export function useUnsavedChangesWarning(active: boolean) {
   useEffect(() => {
     if (!active) return;
@@ -12,8 +18,22 @@ export function useUnsavedChangesWarning(active: boolean) {
       event.preventDefault();
       event.returnValue = "";
     };
+    // Capture phase on document runs before Next.js <Link>'s own handler.
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      if (!link || link.getAttribute("target") === "_blank") return;
+      if (!window.confirm(UNSAVED_MESSAGE)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
     window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      document.removeEventListener("click", onClick, true);
+    };
   }, [active]);
 }
 
