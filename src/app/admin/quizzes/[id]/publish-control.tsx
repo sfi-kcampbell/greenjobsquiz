@@ -8,11 +8,13 @@ export function PublishControl({
   status,
   healthWarnings,
   apiUrl,
+  pageUrl,
 }: {
   quizId: number;
   status: "draft" | "published";
   healthWarnings: number;
   apiUrl: string;
+  pageUrl: string;
 }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -48,9 +50,17 @@ export function PublishControl({
         )}
       </p>
       {published && (
-        <p className="text-muted">
-          Public API: <code className="break-all">{apiUrl}</code>
-        </p>
+        <>
+          <p>
+            <a href={pageUrl} target="_blank" rel="noopener noreferrer" className="text-brand underline underline-offset-4">
+              View the quiz page
+            </a>{" "}
+            <span className="text-muted">({pageUrl})</span>
+          </p>
+          <p className="text-muted">
+            Public API: <code className="break-all">{apiUrl}</code>
+          </p>
+        </>
       )}
       <div className="flex flex-wrap items-center gap-3">
         {published ? (

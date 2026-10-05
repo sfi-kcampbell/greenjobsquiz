@@ -12,6 +12,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 3** (Responses): a responses × categories weight grid with live near-duplicate and no-weights warnings and "Normalize to 10", plus an editor per response (summary, rich description, call to action, and a Category Profile with live bars).
 - **Phase 4** (Scoring): the scoring engine (`src/lib/scoring/engine.ts`, pure and fully unit-tested), the Simulate tab (answer as a respondent, see the ranked responses and category profile, and search for answers that produce a given response), the Health tab with its warning count on the tab, and scoring settings (runners-up, category balancing, fallback response) on the quiz settings page.
 - **Phase 5** (Public API): publishing, and the `/api/v1` API for respondents: quiz structure (never weights), saved progress, restart, server-side scoring on submit, shareable result links, and attempt history.
+- **Phase 6** (Quiz page): the public quiz page at `/quizzes/{slug}` (title, intro, questions one at a time, answers saved as they're picked, and the result with runners-up and a category profile), published quizzes listed on the home page, and an Introduction field in quiz settings. The page HTML is cached and holds no respondent data; editing the title, slug or intro, publishing, unpublishing or deleting a quiz refreshes it immediately. Direct database edits show up within 5 minutes.
 
 See the build order in SPEC.md for what comes next.
 

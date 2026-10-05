@@ -148,8 +148,11 @@ export async function saveAnswers(
   if (row?.status === "completed") {
     throw new PublicError(409, "quiz_already_submitted", "This attempt was already submitted. Start over to answer again.");
   }
+  // A client with no session yet holds revision 0; a write that creates the attempt isn't stale.
+  let created = false;
   if (!row || row.status === "abandoned") {
     row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null);
+    created = true;
   }
 
   const patch: Answers = {};
@@ -174,7 +177,7 @@ export async function saveAnswers(
     throw new PublicError(409, "quiz_already_submitted", "This attempt was just submitted. Start over to answer again.");
   }
 
-  const previous = updated.revision - 1;
+  const previous = created ? 0 : updated.revision - 1;
   return {
     newToken: token,
     tokenHash,
@@ -400,7 +403,8 @@ export type ResultPayload = {
     raw: number | null;
   } | null;
   runnersUp: { resultId: number; title: string; excerpt: string | null; percent: number; raw: number }[];
-  scores: Record<string, { raw: number; normalized: number | null; label: string; color: string }>;
+  /** Per category; `percent` is the score as a share of the most achievable (0–100). */
+  scores: Record<string, { raw: number; normalized: number | null; percent: number; label: string; color: string }>;
 };
 
 type StoredScores = {
@@ -410,6 +414,9 @@ type StoredScores = {
   categories: Record<string, { raw: number; normalized: number | null; max: number; label: string; color: string }>;
 };
 type StoredRanked = { resultId: number; raw: number; title: string }[];
+
+const shareOfMax = (raw: number, max: number) =>
+  max > 0 ? Math.round(100 * Math.max(0, Math.min(1, raw / max))) : 0;
 
 /** The token is the credential; unknown or revoked tokens look the same. */
 export async function getResultByShareToken(db: Executor, shareToken: string): Promise<ResultPayload | null> {
@@ -461,7 +468,10 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
     match,
     runnersUp,
     scores: Object.fromEntries(
-      Object.entries(scores.categories).map(([id, s]) => [id, { raw: s.raw, normalized: s.normalized, label: s.label, color: s.color }]),
+      Object.entries(scores.categories).map(([id, s]) => [
+        id,
+        { raw: s.raw, normalized: s.normalized, percent: shareOfMax(s.raw, s.max), label: s.label, color: s.color },
+      ]),
     ),
   };
 }
