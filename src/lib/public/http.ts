@@ -156,11 +156,21 @@ export async function loadPublishedQuiz(idParam: string): Promise<PublicQuiz> {
 
 type Caching = { kind: "none" } | { kind: "public"; etag?: string; maxAge?: number };
 
+/**
+ * Browsers always revalidate (a cheap 304 thanks to the ETag); only shared
+ * caches keep a copy. stale-while-revalidate in Cache-Control would let a
+ * browser keep showing old settings for minutes after an admin change.
+ */
+function setPublicCaching(res: NextResponse, maxAge = 300) {
+  res.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  res.headers.set("CDN-Cache-Control", `public, s-maxage=${maxAge}, stale-while-revalidate=600`);
+}
+
 export async function respond(req: NextRequest, body: unknown, opts: { status?: number; caching?: Caching } = {}) {
   const caching = opts.caching ?? { kind: "none" };
   const res = NextResponse.json(body, { status: opts.status ?? 200 });
   if (caching.kind === "public") {
-    res.headers.set("Cache-Control", `public, max-age=0, s-maxage=${caching.maxAge ?? 300}, stale-while-revalidate=600`);
+    setPublicCaching(res, caching.maxAge);
     if (caching.etag) res.headers.set("ETag", caching.etag);
   } else {
     res.headers.set("Cache-Control", "no-store, private");
@@ -177,7 +187,7 @@ export async function notModified(req: NextRequest, etag: string): Promise<NextR
   if (!match || !match.split(",").map((s) => s.trim()).includes(etag)) return null;
   const res = new NextResponse(null, { status: 304 });
   res.headers.set("ETag", etag);
-  res.headers.set("Cache-Control", "public, max-age=0, s-maxage=300, stale-while-revalidate=600");
+  setPublicCaching(res);
   await applyCors(req, res);
   return res;
 }

@@ -5,7 +5,9 @@ import { ApiError, quizApi, type Answers } from "./api";
 import { Progress } from "./progress";
 import { QuestionView } from "./question-view";
 import { ResultView } from "./result-view";
-import { answeredCount, currentQuestion, initialState, isSavable, quizReducer } from "./state";
+import { ResumeView } from "./resume-view";
+import { ReviewView } from "./review-view";
+import { answeredCount, currentQuestion, firstProblem, initialState, isSavable, quizReducer } from "./state";
 
 type PendingSave = { answerIds: number[]; currentIndex: number };
 
@@ -24,6 +26,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
   const pending = useRef(new Map<number, PendingSave>());
   const revision = useRef(0);
   const running = useRef<Promise<void> | null>(null);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const emit = useCallback((name: string, detail: Record<string, unknown>) => {
     rootRef.current?.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: { quizId, ...detail } }));
@@ -51,6 +54,24 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       cancelled = true;
     };
   }, [api, state.phase]);
+
+  // Earlier attempts, shown under the result.
+  const resultAttempt = state.result?.attemptNo;
+  useEffect(() => {
+    if (resultAttempt === undefined) return;
+    let cancelled = false;
+    api
+      .attempts()
+      .then((attempts) => !cancelled && dispatch({ type: "attempts", attempts }))
+      .catch(() => {}); // optional extra; the result itself is already shown
+    return () => {
+      cancelled = true;
+    };
+  }, [api, resultAttempt]);
+
+  useEffect(() => () => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+  }, []);
 
   /* --------------------------------- Save -------------------------------- */
 
@@ -97,11 +118,39 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     if (!isSavable(question, answerIds)) return; // e.g. a multi-select below its minimum
     pending.current.set(question.id, { answerIds, currentIndex: state.index });
     flush().catch(() => {});
+
+    // Optional auto-advance for single-choice questions; Next is always there too.
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    if (state.quiz?.settings.autoAdvance && question.type === "single" && answerIds.length === 1) {
+      advanceTimer.current = setTimeout(() => dispatch({ type: "next" }), 400);
+    }
+  };
+
+  /* -------------------------------- Restart ------------------------------ */
+
+  /** A new attempt; the previous one (and any result) is kept on the server. */
+  const restart = async () => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    dispatch({ type: "restart" });
+    pending.current.clear();
+    await running.current?.catch(() => {});
+    try {
+      const session = await api.restart();
+      revision.current = session.revision;
+      dispatch({ type: "restarted", revision: session.revision });
+      emit("quiz:restart", { attemptNo: session.attemptNo });
+    } catch (error) {
+      dispatch({ type: "restart_failed", message: messageOf(error) });
+    }
   };
 
   /* -------------------------------- Submit ------------------------------- */
 
   const submit = async () => {
+    if (state.quiz && firstProblem(state.quiz, state.answers)) {
+      dispatch({ type: "submit" }); // the reducer moves to the first problem
+      return;
+    }
     dispatch({ type: "submit" });
     try {
       await flush();
@@ -137,6 +186,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       {/* One polite announcement per step; the step itself isn't a live region. */}
       <p aria-live="polite" className="sr-only">
         {state.phase === "question" && question ? `Question ${state.index + 1} of ${total}` : ""}
+        {state.phase === "review" ? "Check your answers before seeing your result." : ""}
         {state.phase === "result" ? "Your result is ready." : ""}
       </p>
 
@@ -161,7 +211,18 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
         </div>
       )}
 
-      {(state.phase === "question" || state.phase === "submitting") && quiz && question && (
+      {state.phase === "resume" && quiz && (
+        <ResumeView
+          answered={answeredCount(state)}
+          total={total}
+          busy={state.restarting}
+          error={state.error}
+          onResume={() => dispatch({ type: "resume" })}
+          onStartOver={restart}
+        />
+      )}
+
+      {(state.phase === "question" || state.phase === "review" || state.phase === "submitting") && quiz && (
         <>
           {quiz.settings.showProgress && <Progress answered={answeredCount(state)} total={total} />}
           {state.saveFailed && (
@@ -172,23 +233,43 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
               </button>
             </div>
           )}
-          <QuestionView
-            key={question.id}
-            question={question}
-            number={state.index + 1}
-            total={total}
-            selected={state.answers[String(question.id)] ?? []}
-            isLast={state.index === total - 1}
-            busy={state.phase === "submitting"}
-            error={state.error}
-            onSelect={select}
-            onBack={state.index > 0 ? () => dispatch({ type: "back" }) : null}
-            onNext={() => (state.index === total - 1 ? submit() : dispatch({ type: "next" }))}
-          />
+          {state.phase === "question" && question ? (
+            <QuestionView
+              key={question.id}
+              question={question}
+              number={state.index + 1}
+              total={total}
+              selected={state.answers[String(question.id)] ?? []}
+              nextLabel={state.fromReview ? "Back to review" : state.index === total - 1 ? "Review answers" : "Next"}
+              busy={false}
+              error={state.error}
+              onSelect={select}
+              onBack={state.index > 0 && !state.fromReview ? () => dispatch({ type: "back" }) : null}
+              onNext={() => dispatch({ type: "next" })}
+            />
+          ) : (
+            <ReviewView
+              quiz={quiz}
+              answers={state.answers}
+              busy={state.phase === "submitting"}
+              error={state.error}
+              onEdit={(index) => dispatch({ type: "edit", index })}
+              onBack={() => dispatch({ type: "back" })}
+              onSubmit={submit}
+            />
+          )}
         </>
       )}
 
-      {state.phase === "result" && state.result && <ResultView result={state.result} />}
+      {state.phase === "result" && state.result && quiz && (
+        <ResultView
+          result={state.result}
+          attempts={state.attempts}
+          onRetake={quiz.settings.retakeAllowed ? restart : null}
+          restarting={state.restarting}
+          error={state.error}
+        />
+      )}
 
       {state.phase === "error" && (
         <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger/40 bg-surface p-4">

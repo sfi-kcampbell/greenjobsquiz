@@ -338,7 +338,8 @@ anonymous identity, that history lasts as long as the visitor token does.
 1. **No user-specific data in cacheable HTML.** Quiz pages render the title, intro and an empty
    client container. All state comes from the API.
 2. **Quiz structure is the same for everyone.** Serve it with
-   `Cache-Control: public, s-maxage=300, stale-while-revalidate=600` and an ETag built from
+   `CDN-Cache-Control: public, s-maxage=300, stale-while-revalidate=600` for the CDN,
+   `Cache-Control: public, max-age=0, must-revalidate` for browsers, and an ETag built from
    `structure_version`. Invalidate with `revalidateTag('quiz:{id}')` on every content save or
    publish.
 3. **Session, submit and result routes** send `Cache-Control: no-store, private` and run

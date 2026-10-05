@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ResultPayload } from "@/lib/public/sessions";
 import type { PublicQuestion, PublicQuiz } from "@/lib/public/structure";
 import type { SessionResponse } from "./api";
-import { answeredCount, initialState, isSavable, quizReducer, resumeIndex, selectionProblem, type QuizState } from "./state";
+import { answeredCount, firstProblem, initialState, isSavable, overLimit, quizReducer, resumeIndex, selectionProblem, type QuizState } from "./state";
 
 const question = (id: number, extra: Partial<PublicQuestion> = {}): PublicQuestion => ({
   id,
@@ -55,10 +55,11 @@ describe("loading", () => {
     expect(s.quiz).toBe(quiz);
   });
 
-  it("resumes at the first unanswered question", () => {
+  it("offers to resume at the first unanswered question", () => {
     const s = loaded(session({ status: "in_progress", revision: 4, answers: { "1": [11] }, answeredCount: 1 }));
-    expect(s.phase).toBe("question");
+    expect(s.phase).toBe("resume");
     expect(s.index).toBe(1);
+    expect(quizReducer(s, { type: "resume" })).toMatchObject({ phase: "question", index: 1 });
     expect(s.revision).toBe(4);
     expect(s.answers).toEqual({ "1": [11] });
   });
@@ -120,17 +121,64 @@ describe("answering", () => {
 });
 
 describe("submitting", () => {
+  const complete = { "1": [11], "3": [31] };
+
   it("shows the result once submitted", () => {
-    let s = quizReducer(loaded(session()), { type: "submit" });
+    let s = quizReducer({ ...loaded(session()), answers: complete, phase: "review" }, { type: "submit" });
     expect(s.phase).toBe("submitting");
     s = quizReducer(s, { type: "submitted", result });
     expect(s).toMatchObject({ phase: "result", result });
   });
 
-  it("returns to the first missing question with a message", () => {
-    let s = quizReducer(quizReducer(loaded(session()), { type: "start" }), { type: "submit" });
+  it("returns to the first missing question the server reports", () => {
+    let s = quizReducer({ ...loaded(session()), answers: complete, phase: "review" }, { type: "submit" });
     s = quizReducer(s, { type: "submit_failed", message: "Answer the rest", missingQuestionIds: [3, 1] });
-    expect(s).toMatchObject({ phase: "question", index: 2, error: "Answer the rest" });
+    expect(s).toMatchObject({ phase: "question", index: 2, error: "Answer the rest", fromReview: true });
+  });
+
+  it("stays on the review screen for other submit errors", () => {
+    let s = quizReducer({ ...loaded(session()), answers: complete, phase: "review" }, { type: "submit" });
+    s = quizReducer(s, { type: "submit_failed", message: "Offline" });
+    expect(s).toMatchObject({ phase: "review", error: "Offline" });
+  });
+
+  it("checks locally and jumps to the first problem without submitting", () => {
+    const s = quizReducer({ ...loaded(session()), answers: { "1": [11] }, phase: "review" }, { type: "submit" });
+    expect(s).toMatchObject({ phase: "question", index: 2, error: "Choose an answer to continue.", fromReview: true });
+  });
+});
+
+describe("review", () => {
+  it("goes to review after the last question, and Back returns to it", () => {
+    let s: QuizState = { ...loaded(session()), phase: "question", index: 2, answers: { "3": [31] } };
+    s = quizReducer(s, { type: "next" });
+    expect(s.phase).toBe("review");
+    s = quizReducer(s, { type: "back" });
+    expect(s).toMatchObject({ phase: "question", index: 2 });
+  });
+
+  it("edits one answer and returns to review", () => {
+    let s: QuizState = { ...loaded(session()), phase: "review", answers: { "1": [11], "3": [31] } };
+    s = quizReducer(s, { type: "edit", index: 0 });
+    expect(s).toMatchObject({ phase: "question", index: 0, fromReview: true });
+    s = quizReducer(quizReducer(s, { type: "select", questionId: 1, answerIds: [12] }), { type: "next" });
+    expect(s).toMatchObject({ phase: "review", fromReview: false, answers: { "1": [12] } });
+  });
+});
+
+describe("restart", () => {
+  it("starts a fresh attempt at question 1", () => {
+    let s: QuizState = { ...loaded(session()), phase: "result", result, answers: { "1": [11] }, index: 2 };
+    s = quizReducer(s, { type: "restart" });
+    expect(s.restarting).toBe(true);
+    s = quizReducer(s, { type: "restarted", revision: 1 });
+    expect(s).toMatchObject({ phase: "question", index: 0, answers: {}, result: null, revision: 1, restarting: false });
+  });
+
+  it("keeps the current screen and shows why when a restart fails", () => {
+    let s: QuizState = { ...loaded(session()), phase: "result", result };
+    s = quizReducer(quizReducer(s, { type: "restart" }), { type: "restart_failed", message: "Only once" });
+    expect(s).toMatchObject({ phase: "result", restarting: false, error: "Only once" });
   });
 });
 
@@ -148,6 +196,18 @@ describe("helpers", () => {
     expect(selectionProblem(multi, [])).toBeNull();
     expect(selectionProblem(multi, [91])).toMatch(/at least 2/);
     expect(selectionProblem(multi, [91, 92])).toBeNull();
+    expect(selectionProblem(multi, [91, 92, 93, 94])).toMatch(/up to 3/);
+  });
+
+  it("overLimit only fires above a multi-select maximum", () => {
+    expect(overLimit(multi, 3)).toBeNull();
+    expect(overLimit(multi, 4)).toBe("You can choose up to 3. Untick 1 to continue.");
+    expect(overLimit(question(1), 2)).toBeNull();
+  });
+
+  it("firstProblem finds the first blocking question", () => {
+    expect(firstProblem(quiz, { "1": [11], "3": [31] })).toBeNull();
+    expect(firstProblem(quiz, { "3": [31] })).toEqual({ index: 0, message: "Choose an answer to continue." });
   });
 
   it("isSavable matches what the server accepts", () => {

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { PublicQuestion } from "@/lib/public/structure";
 import { RichHtml } from "./rich-html";
-import { selectionProblem } from "./state";
+import { overLimit, selectionProblem } from "./state";
 
 /**
  * One question as a real form: fieldset/legend, native radios or checkboxes,
@@ -15,7 +15,7 @@ export function QuestionView({
   number,
   total,
   selected,
-  isLast,
+  nextLabel,
   busy,
   error,
   onSelect,
@@ -26,7 +26,7 @@ export function QuestionView({
   number: number;
   total: number;
   selected: number[];
-  isLast: boolean;
+  nextLabel: string;
   busy: boolean;
   /** A message from the controller (e.g. submit failed). */
   error: string | null;
@@ -38,7 +38,8 @@ export function QuestionView({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [showProblem, setShowProblem] = useState(false);
   const problem = selectionProblem(question, selected);
-  const message = (showProblem && problem) || error;
+  // Over the maximum shows straight away; other problems wait for Next.
+  const message = overLimit(question, selected.length) || (showProblem && problem) || error;
   const helpId = `${uid}-help`;
   const messageId = `${uid}-message`;
   const multi = question.type === "multi";
@@ -139,7 +140,7 @@ export function QuestionView({
           disabled={busy}
           className="ml-auto rounded-md bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
-          {isLast ? (busy ? "Working out your result…" : "See my result") : "Next"}
+          {nextLabel}
         </button>
       </div>
     </form>
