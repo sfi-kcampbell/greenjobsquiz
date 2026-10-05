@@ -2,11 +2,11 @@
  * Quiz reads and writes. Every function takes the database (or a
  * transaction) so it can be used from server actions and integration tests.
  */
-import { count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Database, Executor } from "@/lib/db/create";
-import { categories, quizzes } from "@/lib/db/schema";
+import { categories, quizzes, results } from "@/lib/db/schema";
 import { ContentError, pgError, PG_FOREIGN_KEY_VIOLATION, PG_UNIQUE_VIOLATION } from "./errors";
-import type { QuizInput } from "./validation";
+import type { QuizInput, QuizScoringInput } from "./validation";
 
 export type QuizSummary = {
   id: number;
@@ -104,4 +104,29 @@ export async function deleteQuiz(db: Database, id: number): Promise<void> {
     }
     throw error;
   }
+}
+
+/** Scoring settings: runners-up shown, per-category balancing, fallback response. */
+export async function updateQuizScoring(db: Database, id: number, input: QuizScoringInput): Promise<void> {
+  await db.transaction(async (tx) => {
+    await lockQuiz(tx, id);
+    if (input.defaultResultId !== null) {
+      const [owned] = await tx
+        .select({ id: results.id })
+        .from(results)
+        .where(and(eq(results.id, input.defaultResultId), eq(results.quizId, id), isNull(results.archivedAt)));
+      if (!owned) {
+        throw new ContentError("invalid", "Choose a fallback response from this quiz.", "defaultResultId");
+      }
+    }
+    await tx
+      .update(quizzes)
+      .set({
+        runnersUpCount: input.runnersUpCount,
+        normalizePerCategory: input.normalizePerCategory,
+        defaultResultId: input.defaultResultId,
+      })
+      .where(eq(quizzes.id, id));
+    await bumpStructureVersion(tx, id);
+  });
 }

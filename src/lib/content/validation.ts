@@ -240,3 +240,17 @@ export const responseDetailsInput = z
     }
   });
 export type ResponseDetailsInput = z.infer<typeof responseDetailsInput>;
+
+/* ------------------------------ Quiz scoring ---------------------------- */
+
+export const quizScoringInput = z.object({
+  runnersUpCount: z.coerce.number().int().min(0, "Use 0 to 5.").max(5, "Use 0 to 5."),
+  normalizePerCategory: z.boolean(),
+  defaultResultId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .catch(null),
+});
+export type QuizScoringInput = z.infer<typeof quizScoringInput>;

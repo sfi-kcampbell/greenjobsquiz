@@ -10,6 +10,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 1** (Categories): the quiz list, quiz settings, the builder shell, and the Categories tab (add, edit, reorder, delete, suggested set).
 - **Phase 2** (Questions): question cards with an answers × categories weight matrix (keyboard entry, row and column totals), rich-text answer details and help text, and drag-to-reorder for questions and answers. Images for questions and answers come later, with media storage.
 - **Phase 3** (Responses): a responses × categories weight grid with live near-duplicate and no-weights warnings and "Normalize to 10", plus an editor per response (summary, rich description, call to action, and a Category Profile with live bars).
+- **Phase 4** (Scoring): the scoring engine (`src/lib/scoring/engine.ts`, pure and fully unit-tested), the Simulate tab (answer as a respondent, see the ranked responses and category profile, and search for answers that produce a given response), the Health tab with its warning count on the tab, and scoring settings (runners-up, category balancing, fallback response) on the quiz settings page.
 
 See the build order in SPEC.md for what comes next.
 

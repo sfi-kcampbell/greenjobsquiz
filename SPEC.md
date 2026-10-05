@@ -236,6 +236,8 @@ pct   = clamp(round(100·angle), 1, 99)   // 100 only when cos ≥ 0.9999
 
 Sanity check: cos .95 → 80%, .80 → 59%, .70 → 49%, 0 → 0%.
 
+As built: the percentage is held between 0 and 99 (not 1–99), so that cos ≤ 0 reads as 0%, consistent with the check values above.
+
 - Store only `raw_similarity`. That keeps the display formula changeable without a migration.
 - Return `isClose = best.raw − second.raw < 0.02` so the UI can say "a strong fit for both…".
 
@@ -507,7 +509,8 @@ warning fires while anything is dirty.
 ### Simulate tab
 
 - **Live scoring:** pick answers to see the category vector as bars, plus the ranked results with
-  scores, from the same scoring module production uses.
+  scores, from the same scoring module production uses. As built, the engine runs in the admin's
+  browser (staff only), so results update instantly; the public API still never sends weights.
 - **Reverse search:** "Find answers that produce Forester" runs a greedy search.
 - **Why it matters:** the scoring model can be built and signed off before the public frontend
   exists.

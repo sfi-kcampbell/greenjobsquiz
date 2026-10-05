@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/access";
 import { failure, idSchema, type FormState } from "@/lib/content/action-result";
-import { createQuiz, deleteQuiz, updateQuiz } from "@/lib/content/quizzes";
-import { quizInput } from "@/lib/content/validation";
+import { createQuiz, deleteQuiz, updateQuiz, updateQuizScoring } from "@/lib/content/quizzes";
+import { quizInput, quizScoringInput } from "@/lib/content/validation";
 import { db } from "@/lib/db/client";
 
 function readQuizForm(formData: FormData) {
@@ -53,4 +53,25 @@ export async function deleteQuizAction(quizId: number, _prev: FormState): Promis
   }
   revalidatePath("/admin/quizzes");
   redirect("/admin/quizzes");
+}
+
+export async function updateScoringAction(
+  quizId: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    const input = quizScoringInput.parse({
+      runnersUpCount: formData.get("runnersUpCount"),
+      normalizePerCategory: formData.get("normalizePerCategory") === "on",
+      defaultResultId: formData.get("defaultResultId") || null,
+    });
+    await updateQuizScoring(db, id, input);
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "Scoring settings saved." };
 }
