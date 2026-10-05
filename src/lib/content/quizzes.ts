@@ -130,3 +130,19 @@ export async function updateQuizScoring(db: Database, id: number, input: QuizSco
     await bumpStructureVersion(tx, id);
   });
 }
+
+/** Publish or unpublish. Unpublishing never touches submissions. */
+export async function setQuizStatus(db: Database, id: number, status: "draft" | "published"): Promise<void> {
+  await db.transaction(async (tx) => {
+    await lockQuiz(tx, id);
+    await tx
+      .update(quizzes)
+      .set({
+        status,
+        // Remember the first publish; keep it through later unpublish/publish cycles.
+        ...(status === "published" ? { publishedAt: sql`coalesce(${quizzes.publishedAt}, now())` } : {}),
+      })
+      .where(eq(quizzes.id, id));
+    await bumpStructureVersion(tx, id);
+  });
+}

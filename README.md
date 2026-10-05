@@ -11,6 +11,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 2** (Questions): question cards with an answers × categories weight matrix (keyboard entry, row and column totals), rich-text answer details and help text, and drag-to-reorder for questions and answers. Images for questions and answers come later, with media storage.
 - **Phase 3** (Responses): a responses × categories weight grid with live near-duplicate and no-weights warnings and "Normalize to 10", plus an editor per response (summary, rich description, call to action, and a Category Profile with live bars).
 - **Phase 4** (Scoring): the scoring engine (`src/lib/scoring/engine.ts`, pure and fully unit-tested), the Simulate tab (answer as a respondent, see the ranked responses and category profile, and search for answers that produce a given response), the Health tab with its warning count on the tab, and scoring settings (runners-up, category balancing, fallback response) on the quiz settings page.
+- **Phase 5** (Public API): publishing, and the `/api/v1` API for respondents: quiz structure (never weights), saved progress, restart, server-side scoring on submit, shareable result links, and attempt history.
 
 See the build order in SPEC.md for what comes next.
 
@@ -29,6 +30,30 @@ Until Resend is configured, staff can sign in with their email plus a shared PIN
 2. On `/sign-in`, use the **Sign in with PIN** card. The email must still be a Super Admin or an active Admin.
 
 PIN sessions last 12 hours. Attempts are limited to 5 per 15 minutes per IP address and 30 per 15 minutes overall. **Delete `SECRET_PIN` and redeploy before launch**; the PIN option disappears as soon as the variable is gone.
+
+## Public API (`/api/v1`)
+
+Used by the hosted quiz pages, the embed and any headless app. Only **published** quizzes are visible; drafts return 404.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/quizzes` | Published quizzes |
+| GET | `/quizzes/{id}`, `/quizzes/by-slug/{slug}` | Questions and answers (never weights). Cacheable, with ETag |
+| GET | `/quizzes/{id}/session` | The respondent's progress. Creates nothing |
+| PUT | `/quizzes/{id}/session/answer` | `{questionId, answerIds, clientRevision?, currentIndex?}`. The first one returns `sessionKey` and sets the `pltq_visitor` cookie |
+| POST | `/quizzes/{id}/session/answers` | Batch (`sendBeacon`); accepts `sessionKey` in the body |
+| POST | `/quizzes/{id}/session/restart` | New attempt; earlier ones are kept |
+| POST | `/quizzes/{id}/submit` | `{email?}`. Scores on the server and returns the result and share link |
+| GET | `/results/{token}` | A shared result |
+| GET | `/quizzes/{id}/attempts` | The respondent's past attempts |
+
+Respondents are identified by the `X-Quiz-Session` header (embeds and headless apps) or the `pltq_visitor` cookie (the hosted pages). Errors look like `{"error": {"code": "quiz_…", "message": "…"}}`.
+
+**Required in production: `TOKEN_PEPPER`**, a long random value (for example `openssl rand -hex 32`). Respondent sessions and share links are stored as keyed hashes with it, so **never change it** once respondents have used the quiz.
+
+**If you put a CDN in front of Vercel**, exclude `/api/v1/quizzes/*/session*`, `/api/v1/quizzes/*/submit`, `/api/v1/quizzes/*/attempts` and `/api/v1/results/*` from caching. A cached session response would show one visitor another's progress.
+
+Cross-site API access (headless apps) is allowed only for origins listed in the `settings` table's `cors_origins`; a Settings screen for this comes later.
 
 ## Local development
 
