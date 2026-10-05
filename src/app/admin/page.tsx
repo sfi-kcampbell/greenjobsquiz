@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ConfigWarning } from "@/components/config-warning";
 import { requireStaff } from "@/lib/auth/access";
 
 export default async function AdminDashboard() {
@@ -7,6 +8,7 @@ export default async function AdminDashboard() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <ConfigWarning />
       <p className="text-muted">
         Signed in as {staff.email}. {staff.role === "super_admin" ? "You're a Super Admin." : "You're an Admin."}
       </p>

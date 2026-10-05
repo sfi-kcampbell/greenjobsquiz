@@ -112,10 +112,10 @@ describe("answering", () => {
 
   it("takes the server's answers on a stale save", () => {
     let s = quizReducer(started(), { type: "select", questionId: 1, answerIds: [12] });
-    s = quizReducer(s, { type: "save_failed" });
-    expect(s.saveFailed).toBe(true);
+    s = quizReducer(s, { type: "save_failed", message: "Offline" });
+    expect(s.saveError).toBe("Offline");
     s = quizReducer(s, { type: "saved", revision: 7, answers: { "1": [13], "2": [21] } });
-    expect(s).toMatchObject({ revision: 7, answers: { "1": [13], "2": [21] }, saveFailed: false });
+    expect(s).toMatchObject({ revision: 7, answers: { "1": [13], "2": [21] }, saveError: null });
     expect(quizReducer(s, { type: "saved", revision: 8 }).answers).toEqual({ "1": [13], "2": [21] });
   });
 });

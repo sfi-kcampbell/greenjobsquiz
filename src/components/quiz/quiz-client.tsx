@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import { ApiError, quizApi, type Answers } from "./api";
+import { errorMessage, saveErrorMessage } from "./messages";
 import { Progress } from "./progress";
 import { QuestionView } from "./question-view";
 import { ResultView } from "./result-view";
@@ -10,9 +11,6 @@ import { ReviewView } from "./review-view";
 import { answeredCount, currentQuestion, firstProblem, initialState, isSavable, quizReducer } from "./state";
 
 type PendingSave = { answerIds: number[]; currentIndex: number };
-
-const messageOf = (error: unknown) =>
-  error instanceof ApiError ? error.message : "Something went wrong. Please try again.";
 
 /**
  * The respondent client. All state comes from /api/v1 (never from the cached
@@ -47,7 +45,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
         revision.current = session.revision;
         dispatch({ type: "loaded", quiz, session, result });
       } catch (error) {
-        if (!cancelled) dispatch({ type: "load_failed", message: messageOf(error) });
+        if (!cancelled) dispatch({ type: "load_failed", message: errorMessage(error) });
       }
     })();
     return () => {
@@ -90,7 +88,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
             currentIndex: entry.currentIndex,
           });
         } catch (error) {
-          dispatch({ type: "save_failed" });
+          dispatch({ type: "save_failed", message: saveErrorMessage(error) });
           throw error;
         }
         // A newer pick for the same question may have been queued meanwhile.
@@ -140,7 +138,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       dispatch({ type: "restarted", revision: session.revision });
       emit("quiz:restart", { attemptNo: session.attemptNo });
     } catch (error) {
-      dispatch({ type: "restart_failed", message: messageOf(error) });
+      dispatch({ type: "restart_failed", message: errorMessage(error) });
     }
   };
 
@@ -154,8 +152,8 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     dispatch({ type: "submit" });
     try {
       await flush();
-    } catch {
-      dispatch({ type: "submit_failed", message: "We couldn't save all your answers. Check your connection and try again." });
+    } catch (error) {
+      dispatch({ type: "submit_failed", message: saveErrorMessage(error) });
       return;
     }
     try {
@@ -169,7 +167,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
         message:
           error instanceof ApiError && error.code === "quiz_missing_answers"
             ? "Please answer this question to see your result."
-            : messageOf(error),
+            : errorMessage(error),
         missingQuestionIds: Array.isArray(missing) ? missing.filter((id): id is number => typeof id === "number") : undefined,
       });
     }
@@ -225,9 +223,9 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       {(state.phase === "question" || state.phase === "review" || state.phase === "submitting") && quiz && (
         <>
           {quiz.settings.showProgress && <Progress answered={answeredCount(state)} total={total} />}
-          {state.saveFailed && (
+          {state.saveError && (
             <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-danger/40 bg-danger/5 px-4 py-2 text-sm">
-              <span>We couldn&apos;t save your last answer.</span>
+              <span>{state.saveError}</span>
               <button type="button" onClick={() => flush().catch(() => {})} className="font-medium text-danger underline underline-offset-4">
                 Retry
               </button>

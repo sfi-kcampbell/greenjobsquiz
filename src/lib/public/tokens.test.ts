@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashToken, isToken, newToken, shareTokenFor } from "./tokens";
+import { hashToken, isToken, missingPublicConfig, newToken, shareTokenFor } from "./tokens";
 
 describe("tokens", () => {
   it("makes 64-hex tokens that are unique", () => {
@@ -29,5 +29,13 @@ describe("tokens", () => {
       expect(isToken(bad)).toBe(false);
     }
     expect(isToken("a".repeat(32))).toBe(true);
+  });
+});
+
+describe("missingPublicConfig", () => {
+  it("flags a missing pepper in production only", () => {
+    expect(missingPublicConfig({ NODE_ENV: "production" })).toEqual(["TOKEN_PEPPER"]);
+    expect(missingPublicConfig({ NODE_ENV: "production", TOKEN_PEPPER: "x".repeat(64) })).toEqual([]);
+    expect(missingPublicConfig({ NODE_ENV: "development" })).toEqual([]);
   });
 });

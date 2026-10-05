@@ -46,3 +46,13 @@ export function shareTokenFor(sessionTokenHash: string, submissionId: number): s
 export function isToken(value: unknown): value is string {
   return typeof value === "string" && TOKEN_PATTERN.test(value);
 }
+
+/**
+ * Settings respondents can't do without, for warnings in the admin. Without
+ * TOKEN_PEPPER every answer save fails in production (by design: see pepper()).
+ */
+export function missingPublicConfig(env: Record<string, string | undefined> = process.env): string[] {
+  const problems: string[] = [];
+  if (!env.TOKEN_PEPPER && env.NODE_ENV === "production") problems.push("TOKEN_PEPPER");
+  return problems;
+}

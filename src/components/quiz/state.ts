@@ -20,8 +20,8 @@ export type QuizState = {
   attempts: Attempt[];
   /** A blocking problem (load failed) or a message shown on the question (submit failed). */
   error: string | null;
-  /** Some answers couldn't be saved; the respondent can retry. */
-  saveFailed: boolean;
+  /** Why the last save failed (the respondent can retry), or null. */
+  saveError: string | null;
   /** Editing one answer from the review screen: Next returns there. */
   fromReview: boolean;
   /** A restart request is in flight. */
@@ -39,7 +39,7 @@ export type QuizAction =
   | { type: "back" }
   | { type: "edit"; index: number }
   | { type: "saved"; revision: number; answers?: Answers }
-  | { type: "save_failed" }
+  | { type: "save_failed"; message: string }
   | { type: "submit" }
   | { type: "submitted"; result: ResultPayload }
   | { type: "submit_failed"; message: string; missingQuestionIds?: number[] }
@@ -57,7 +57,7 @@ export const initialState: QuizState = {
   result: null,
   attempts: [],
   error: null,
-  saveFailed: false,
+  saveError: null,
   fromReview: false,
   restarting: false,
 };
@@ -153,10 +153,10 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
         revision: action.revision,
         // Stale: another tab or an old page wrote too. The server's set wins.
         answers: action.answers ?? state.answers,
-        saveFailed: false,
+        saveError: null,
       };
     case "save_failed":
-      return { ...state, saveFailed: true };
+      return { ...state, saveError: action.message };
     case "submit": {
       // Check locally first, so the respondent lands on the first problem without a round trip.
       const problem = state.quiz && firstProblem(state.quiz, state.answers);
@@ -186,7 +186,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
         revision: action.revision,
         result: null,
         error: null,
-        saveFailed: false,
+        saveError: null,
         fromReview: false,
         restarting: false,
       };

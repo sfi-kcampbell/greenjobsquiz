@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ConfigWarning } from "@/components/config-warning";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
@@ -52,6 +53,7 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         <h2 id="publishing" className="font-semibold">
           Publishing
         </h2>
+        <ConfigWarning />
         <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} pageUrl={pageUrl} />
       </section>
 
