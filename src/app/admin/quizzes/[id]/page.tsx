@@ -3,7 +3,6 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
-import { appUrl } from "@/lib/app-url";
 import { healthReport } from "@/lib/scoring/health";
 import { loadBundle, loadQuiz } from "./load";
 import { PublishControl } from "./publish-control";
@@ -19,9 +18,9 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
   const quiz = await loadQuiz((await params).id);
   const responses = await listResponses(db, quiz.id);
   const healthWarnings = healthReport((await loadBundle(quiz.id)).health).warningCount;
-  const base = await appUrl();
-  const apiUrl = `${base}/api/v1/quizzes/${quiz.id}`;
-  const pageUrl = `${base}/quizzes/${quiz.slug}`;
+  // Relative, so previews link to themselves rather than to APP_URL.
+  const apiUrl = `/api/v1/quizzes/${quiz.id}`;
+  const pageUrl = `/quizzes/${quiz.slug}`;
 
   return (
     <div className="flex flex-col gap-8">
