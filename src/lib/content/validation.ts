@@ -31,6 +31,8 @@ export const quizInput = z.object({
     .min(1, "Enter a URL slug.")
     .max(SLUG_MAX, `Keep the slug under ${SLUG_MAX} characters.`)
     .regex(SLUG_PATTERN, "Use lowercase letters, numbers and single hyphens only."),
+  /** Shown above the Start button. Omitted (undefined) leaves it unchanged. */
+  introHtml: z.string().max(20_000, "The introduction is too long.").optional(),
 });
 export type QuizInput = z.infer<typeof quizInput>;
 

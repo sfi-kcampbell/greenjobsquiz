@@ -92,8 +92,10 @@ describe.skipIf(!TEST_DATABASE_URL)("public: structure and sessions (Postgres)",
     expect((await getSessionView(db, quiz, null)).status).toBe("none");
     expect(await db.select().from(quizSessions)).toHaveLength(0);
 
-    const first = await saveAnswers(db, quiz, { tokenHash: null, entries: [{ questionId: q1, answerIds: [a.hike] }] });
+    // A new respondent's client holds revision 0 (from the "none" view): not stale.
+    const first = await saveAnswers(db, quiz, { tokenHash: null, entries: [{ questionId: q1, answerIds: [a.hike] }], clientRevision: 0 });
     expect(first.newToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(first.stale).toBe(false);
     expect(first.view).toMatchObject({ status: "in_progress", attemptNo: 1, answeredCount: 1, total: 3 });
     const [row] = await db.select().from(quizSessions);
     expect(row.tokenHash).not.toBe(first.newToken); // only the hash is stored
@@ -197,6 +199,10 @@ describe.skipIf(!TEST_DATABASE_URL)("public: structure and sessions (Postgres)",
       runnersUp: [{ resultId: analyst, title: "Analyst", percent: 0 }],
     });
     expect(Object.values(payload!.scores).map((x) => x.label)).toEqual(["Outdoors", "Analytical"]);
+    const [outdoors, analytical] = Object.values(payload!.scores);
+    expect(outdoors.percent).toBeGreaterThan(0);
+    expect(outdoors.percent).toBeLessThanOrEqual(100);
+    expect(analytical.percent).toBeGreaterThanOrEqual(0);
     expect(await getResultByShareToken(db, "f".repeat(32))).toBeNull();
 
     // History survives the response being deleted.

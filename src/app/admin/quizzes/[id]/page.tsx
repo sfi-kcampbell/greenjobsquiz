@@ -19,7 +19,9 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
   const quiz = await loadQuiz((await params).id);
   const responses = await listResponses(db, quiz.id);
   const healthWarnings = healthReport((await loadBundle(quiz.id)).health).warningCount;
-  const apiUrl = `${await appUrl()}/api/v1/quizzes/${quiz.id}`;
+  const base = await appUrl();
+  const apiUrl = `${base}/api/v1/quizzes/${quiz.id}`;
+  const pageUrl = `${base}/quizzes/${quiz.slug}`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -43,14 +45,14 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         <h2 id="details" className="font-semibold">
           Details
         </h2>
-        <SettingsForm quizId={quiz.id} title={quiz.title} slug={quiz.slug} />
+        <SettingsForm quizId={quiz.id} title={quiz.title} slug={quiz.slug} introHtml={quiz.introHtml} />
       </section>
 
       <section aria-labelledby="publishing" className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
         <h2 id="publishing" className="font-semibold">
           Publishing
         </h2>
-        <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} />
+        <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} pageUrl={pageUrl} />
       </section>
 
       <section aria-labelledby="scoring" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">

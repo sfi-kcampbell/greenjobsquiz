@@ -5,6 +5,7 @@
 import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Database, Executor } from "@/lib/db/create";
 import { categories, quizzes, results } from "@/lib/db/schema";
+import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError, pgError, PG_FOREIGN_KEY_VIOLATION, PG_UNIQUE_VIOLATION } from "./errors";
 import type { QuizInput, QuizScoringInput } from "./validation";
 
@@ -81,7 +82,14 @@ export async function updateQuiz(db: Database, id: number, input: QuizInput): Pr
   try {
     await db.transaction(async (tx) => {
       await lockQuiz(tx, id);
-      await tx.update(quizzes).set({ title: input.title, slug: input.slug }).where(eq(quizzes.id, id));
+      await tx
+        .update(quizzes)
+        .set({
+          title: input.title,
+          slug: input.slug,
+          ...(input.introHtml !== undefined ? { introHtml: sanitizeRichText(input.introHtml) ?? "" } : {}),
+        })
+        .where(eq(quizzes.id, id));
       await bumpStructureVersion(tx, id);
     });
   } catch (error) {

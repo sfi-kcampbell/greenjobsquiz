@@ -64,6 +64,14 @@ describe.skipIf(!TEST_DATABASE_URL)("content: quizzes and categories (Postgres)"
       expect((await getQuiz(db, quizId))!.slug).toBe("green-careers");
       expect(await version(db, quizId)).toBe(before + 1);
 
+      // The intro is sanitized; leaving it out keeps it; an empty editor clears it.
+      await updateQuiz(db, quizId, { title: "Green Careers", slug: "green-careers", introHtml: '<p>Hi<script>x</script></p>' });
+      expect((await getQuiz(db, quizId))!.introHtml).toBe("<p>Hi</p>");
+      await updateQuiz(db, quizId, { title: "Green Careers", slug: "green-careers" });
+      expect((await getQuiz(db, quizId))!.introHtml).toBe("<p>Hi</p>");
+      await updateQuiz(db, quizId, { title: "Green Careers", slug: "green-careers", introHtml: "<p></p>" });
+      expect((await getQuiz(db, quizId))!.introHtml).toBe("");
+
       await createCategory(db, quizId, cat("Outdoors", "OUTD"));
       const list = await listQuizzes(db);
       expect(list.find((q) => q.id === quizId)?.categoryCount).toBe(1);

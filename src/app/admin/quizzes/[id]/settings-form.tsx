@@ -1,20 +1,43 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import type { FormState } from "@/lib/content/action-result";
 import { deleteQuizAction, updateQuizAction } from "../actions";
 import { QuizFields } from "../quiz-fields";
 
-export function SettingsForm({ quizId, title, slug }: { quizId: number; title: string; slug: string }) {
+export function SettingsForm({
+  quizId,
+  title,
+  slug,
+  introHtml,
+}: {
+  quizId: number;
+  title: string;
+  slug: string;
+  introHtml: string;
+}) {
   const [state, action, pending] = useActionState<FormState, FormData>(
     updateQuizAction.bind(null, quizId),
     {},
   );
+  const [intro, setIntro] = useState(introHtml);
 
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>
       <div className="flex flex-wrap gap-3">
         <QuizFields idPrefix="quiz" defaultTitle={title} defaultSlug={slug} errors={state.fieldErrors} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="quiz-intro" className="text-sm font-medium">
+          Introduction
+        </label>
+        <p id="quiz-intro-hint" className="text-sm text-muted">
+          Shown on the quiz page above the Start button.
+        </p>
+        <RichTextEditor id="quiz-intro" label="Introduction" value={intro} onChange={setIntro} />
+        <input type="hidden" name="introHtml" value={intro} />
+        {state.fieldErrors?.introHtml && <p className="text-sm text-danger">{state.fieldErrors.introHtml}</p>}
       </div>
       <div className="flex items-center gap-3">
         <button
