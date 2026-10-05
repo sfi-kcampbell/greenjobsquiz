@@ -3,7 +3,10 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
-import { loadQuiz } from "./load";
+import { appUrl } from "@/lib/app-url";
+import { healthReport } from "@/lib/scoring/health";
+import { loadBundle, loadQuiz } from "./load";
+import { PublishControl } from "./publish-control";
 import { ScoringForm } from "./scoring-form";
 import { DeleteQuizForm, SettingsForm } from "./settings-form";
 
@@ -15,6 +18,8 @@ export async function generateMetadata({ params }: PageProps<"/admin/quizzes/[id
 export default async function QuizSettingsPage({ params }: PageProps<"/admin/quizzes/[id]">) {
   const quiz = await loadQuiz((await params).id);
   const responses = await listResponses(db, quiz.id);
+  const healthWarnings = healthReport((await loadBundle(quiz.id)).health).warningCount;
+  const apiUrl = `${await appUrl()}/api/v1/quizzes/${quiz.id}`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -39,7 +44,13 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
           Details
         </h2>
         <SettingsForm quizId={quiz.id} title={quiz.title} slug={quiz.slug} />
-        <p className="text-sm text-muted">Publishing arrives with the public quiz pages in Phase 5.</p>
+      </section>
+
+      <section aria-labelledby="publishing" className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+        <h2 id="publishing" className="font-semibold">
+          Publishing
+        </h2>
+        <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} />
       </section>
 
       <section aria-labelledby="scoring" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">

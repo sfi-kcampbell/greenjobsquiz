@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/access";
 import { failure, idSchema, type FormState } from "@/lib/content/action-result";
-import { createQuiz, deleteQuiz, updateQuiz, updateQuizScoring } from "@/lib/content/quizzes";
+import { createQuiz, deleteQuiz, setQuizStatus, updateQuiz, updateQuizScoring } from "@/lib/content/quizzes";
 import { quizInput, quizScoringInput } from "@/lib/content/validation";
 import { db } from "@/lib/db/client";
 
@@ -74,4 +74,17 @@ export async function updateScoringAction(
   }
   revalidatePath("/admin/quizzes", "layout");
   return { ok: true, message: "Scoring settings saved." };
+}
+
+export async function setQuizStatusAction(quizId: number, status: "draft" | "published"): Promise<FormState> {
+  await requireStaff();
+  const id = idSchema.parse(quizId);
+  if (status !== "draft" && status !== "published") return { error: "Unknown status." };
+  try {
+    await setQuizStatus(db, id, status);
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: status === "published" ? "Published." : "Unpublished." };
 }
