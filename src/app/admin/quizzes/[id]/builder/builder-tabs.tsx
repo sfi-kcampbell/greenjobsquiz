@@ -11,7 +11,7 @@ const TABS = [
   { slug: "health", label: "Health" },
 ] as const;
 
-export function BuilderTabs({ quizId }: { quizId: number }) {
+export function BuilderTabs({ quizId, healthCount }: { quizId: number; healthCount: number }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Builder" className="border-b border-border">
@@ -31,6 +31,12 @@ export function BuilderTabs({ quizId }: { quizId: number }) {
                 }`}
               >
                 {tab.label}
+                {tab.slug === "health" && healthCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                    {healthCount}
+                    <span className="sr-only"> {healthCount === 1 ? "warning" : "warnings"}</span>
+                  </span>
+                )}
               </Link>
             </li>
           );

@@ -25,7 +25,7 @@ import { db } from "@/lib/db/client";
 type ListResult = ActionResult<{ categories: CategoryView[]; savedId?: number }>;
 
 async function done(quizId: number, savedId?: number): Promise<ListResult> {
-  revalidatePath(`/admin/quizzes/${quizId}/builder/categories`);
+  revalidatePath(`/admin/quizzes/${quizId}/builder`, "layout");
   revalidatePath("/admin/quizzes");
   return { ok: true, data: { categories: await listCategories(db, quizId), savedId } };
 }

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
-import { loadQuiz } from "../load";
+import { healthReport } from "@/lib/scoring/health";
+import { loadBundle, loadQuiz } from "../load";
 import { BuilderTabs } from "./builder-tabs";
 
 export default async function BuilderLayout({ children, params }: LayoutProps<"/admin/quizzes/[id]/builder">) {
   const quiz = await loadQuiz((await params).id);
+  const healthCount = healthReport((await loadBundle(quiz.id)).health).warningCount;
 
   return (
     <div className="flex flex-col gap-6">
@@ -20,7 +22,7 @@ export default async function BuilderLayout({ children, params }: LayoutProps<"/
           </Link>
         </div>
       </div>
-      <BuilderTabs quizId={quiz.id} />
+      <BuilderTabs quizId={quiz.id} healthCount={healthCount} />
       {children}
     </div>
   );

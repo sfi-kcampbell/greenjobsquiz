@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
+import { listResponses } from "@/lib/content/responses";
+import { db } from "@/lib/db/client";
 import { loadQuiz } from "./load";
+import { ScoringForm } from "./scoring-form";
 import { DeleteQuizForm, SettingsForm } from "./settings-form";
 
 export async function generateMetadata({ params }: PageProps<"/admin/quizzes/[id]">): Promise<Metadata> {
@@ -11,6 +14,7 @@ export async function generateMetadata({ params }: PageProps<"/admin/quizzes/[id
 
 export default async function QuizSettingsPage({ params }: PageProps<"/admin/quizzes/[id]">) {
   const quiz = await loadQuiz((await params).id);
+  const responses = await listResponses(db, quiz.id);
 
   return (
     <div className="flex flex-col gap-8">
@@ -36,6 +40,19 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         </h2>
         <SettingsForm quizId={quiz.id} title={quiz.title} slug={quiz.slug} />
         <p className="text-sm text-muted">Publishing arrives with the public quiz pages in Phase 5.</p>
+      </section>
+
+      <section aria-labelledby="scoring" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="scoring" className="font-semibold">
+          Scoring
+        </h2>
+        <ScoringForm
+          quizId={quiz.id}
+          runnersUpCount={quiz.runnersUpCount}
+          normalizePerCategory={quiz.normalizePerCategory}
+          defaultResultId={quiz.defaultResultId}
+          responses={responses.map(({ id, title }) => ({ id, title }))}
+        />
       </section>
 
       <section aria-labelledby="danger" className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-surface p-4">
