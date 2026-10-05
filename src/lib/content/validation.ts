@@ -256,3 +256,12 @@ export const quizScoringInput = z.object({
     .catch(null),
 });
 export type QuizScoringInput = z.infer<typeof quizScoringInput>;
+
+/* --------------------------- Respondent options ------------------------- */
+
+export const quizRespondentInput = z.object({
+  showProgress: z.boolean(),
+  autoAdvance: z.boolean(),
+  retakeAllowed: z.boolean(),
+});
+export type QuizRespondentInput = z.infer<typeof quizRespondentInput>;

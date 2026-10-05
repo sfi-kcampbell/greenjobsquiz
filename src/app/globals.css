@@ -34,6 +34,11 @@ body {
   outline-offset: 2px;
 }
 
+/* Headings focused from script (tabindex=-1) to move screen readers along; not controls. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* Authored rich text (editor and rendered output). */
 .rich-text > * + * {
   margin-top: 0.5em;

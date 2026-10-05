@@ -2,10 +2,24 @@
 
 import { useEffect, useRef } from "react";
 import type { ResultPayload } from "@/lib/public/sessions";
+import type { Attempt } from "./api";
 import { RichHtml } from "./rich-html";
 
-/** The respondent's result: top match, runners-up and their category profile. */
-export function ResultView({ result }: { result: ResultPayload }) {
+/** The respondent's result: top match, runners-up, category profile and earlier attempts. */
+export function ResultView({
+  result,
+  attempts,
+  onRetake,
+  restarting,
+  error,
+}: {
+  result: ResultPayload;
+  attempts: Attempt[];
+  /** Null when the quiz doesn't allow retakes. */
+  onRetake: (() => void) | null;
+  restarting: boolean;
+  error: string | null;
+}) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -13,6 +27,7 @@ export function ResultView({ result }: { result: ResultPayload }) {
 
   const { match } = result;
   const scores = Object.entries(result.scores).sort((a, b) => b[1].percent - a[1].percent);
+  const earlier = attempts.filter((a) => a.attemptNo !== result.attemptNo).reverse();
 
   return (
     <div className="flex flex-col gap-8">
@@ -95,6 +110,47 @@ export function ResultView({ result }: { result: ResultPayload }) {
             ))}
           </ul>
         </section>
+      )}
+
+      {earlier.length > 0 && (
+        <section aria-labelledby="earlier" className="flex flex-col gap-3">
+          <h3 id="earlier" className="text-lg font-semibold">
+            Your earlier results
+          </h3>
+          <ul className="flex flex-col gap-2 text-sm">
+            {earlier.map((a) => (
+              <li key={a.attemptNo} className="flex flex-wrap justify-between gap-2 border-b border-border pb-2">
+                <span>
+                  <span className="text-muted">Attempt {a.attemptNo}: </span>
+                  <span className="font-medium">{a.resultTitle ?? "No match"}</span>
+                  {a.percent !== null && <span className="text-muted"> ({a.percent}% match)</span>}
+                </span>
+                <time dateTime={a.createdAt} className="text-muted">
+                  {new Date(a.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                </time>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {onRetake && (
+        <div className="flex flex-col items-start gap-2">
+          {error && (
+            <p role="alert" className="font-medium text-danger">
+              {error}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onRetake}
+            disabled={restarting}
+            className="rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
+          >
+            {restarting ? "Starting over…" : "Take it again"}
+          </button>
+          <p className="text-sm text-muted">This result stays saved.</p>
+        </div>
       )}
     </div>
   );

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ConfigWarning } from "@/components/config-warning";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
 import { healthReport } from "@/lib/scoring/health";
 import { loadBundle, loadQuiz } from "./load";
 import { PublishControl } from "./publish-control";
+import { RespondentForm } from "./respondent-form";
 import { ScoringForm } from "./scoring-form";
 import { DeleteQuizForm, SettingsForm } from "./settings-form";
 
@@ -51,7 +53,18 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         <h2 id="publishing" className="font-semibold">
           Publishing
         </h2>
+        <ConfigWarning />
         <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} pageUrl={pageUrl} />
+      </section>
+
+      <section aria-labelledby="respondents" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="respondents" className="font-semibold">
+          Respondent options
+        </h2>
+        <RespondentForm
+          quizId={quiz.id}
+          values={{ showProgress: quiz.showProgress, autoAdvance: quiz.autoAdvance, retakeAllowed: quiz.retakeAllowed }}
+        />
       </section>
 
       <section aria-labelledby="scoring" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">

@@ -7,7 +7,7 @@ import { resetTestDb, setupTestDb, teardownTestDb, TEST_DATABASE_URL } from "@/t
 import { createCategory } from "./categories";
 import { ContentError } from "./errors";
 import { saveQuestion } from "./questions";
-import { createQuiz, getQuiz, updateQuizScoring } from "./quizzes";
+import { createQuiz, getQuiz, updateQuizRespondentOptions, updateQuizScoring } from "./quizzes";
 import { saveResponseRow } from "./responses";
 import { loadScoringBundle } from "./scoring-model";
 import { questionInput } from "./validation";
@@ -77,6 +77,14 @@ describe.skipIf(!TEST_DATABASE_URL)("content: scoring model (Postgres)", () => {
 
     const result = score(bundle.model, [{ questionId, answerIds: [answerIds.a] }]);
     expect(result.match?.resultId).toBe(forester);
+  });
+
+  it("updates respondent options and bumps the structure version", async () => {
+    const v0 = (await getQuiz(db, quizId))!.structureVersion;
+    await updateQuizRespondentOptions(db, quizId, { showProgress: false, autoAdvance: true, retakeAllowed: false });
+    const quiz = (await getQuiz(db, quizId))!;
+    expect([quiz.showProgress, quiz.autoAdvance, quiz.retakeAllowed]).toEqual([false, true, false]);
+    expect(quiz.structureVersion).toBe(v0 + 1);
   });
 
   it("updates scoring settings and rejects a fallback from another quiz", async () => {

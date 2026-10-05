@@ -28,6 +28,14 @@ export type SubmitResponse = ResultLinks & {
   result: ResultPayload;
 };
 
+export type Attempt = {
+  attemptNo: number;
+  createdAt: string;
+  resultTitle: string | null;
+  percent: number | null;
+  shareToken: string | null;
+};
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -76,6 +84,8 @@ export function quizApi(quizId: number) {
     saveAnswer: (body: { questionId: number; answerIds: number[]; clientRevision?: number; currentIndex?: number }) =>
       call<SaveResponse>(`${base}/session/answer`, { method: "PUT", body: JSON.stringify(body) }),
     submit: () => call<SubmitResponse>(`${base}/submit`, { method: "POST", body: "{}" }),
+    restart: () => call<Omit<SessionResponse, "result">>(`${base}/session/restart`, { method: "POST", body: "{}" }),
+    attempts: () => call<{ attempts: Attempt[] }>(`${base}/attempts`).then((r) => r.attempts),
     result: (token: string) => call<ResultLinks & { result: ResultPayload }>(`/results/${encodeURIComponent(token)}`),
   };
 }

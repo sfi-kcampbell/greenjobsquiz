@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/access";
 import { failure, idSchema, type FormState } from "@/lib/content/action-result";
-import { createQuiz, deleteQuiz, setQuizStatus, updateQuiz, updateQuizScoring } from "@/lib/content/quizzes";
-import { quizInput, quizScoringInput } from "@/lib/content/validation";
+import { createQuiz, deleteQuiz, setQuizStatus, updateQuiz, updateQuizRespondentOptions, updateQuizScoring } from "@/lib/content/quizzes";
+import { quizInput, quizRespondentInput, quizScoringInput } from "@/lib/content/validation";
 import { db } from "@/lib/db/client";
 import { expireQuizPages } from "@/lib/public/page-cache";
 
@@ -78,6 +78,30 @@ export async function updateScoringAction(
   }
   revalidatePath("/admin/quizzes", "layout");
   return { ok: true, message: "Scoring settings saved." };
+}
+
+export async function updateRespondentOptionsAction(
+  quizId: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    await updateQuizRespondentOptions(
+      db,
+      id,
+      quizRespondentInput.parse({
+        showProgress: formData.get("showProgress") === "on",
+        autoAdvance: formData.get("autoAdvance") === "on",
+        retakeAllowed: formData.get("retakeAllowed") === "on",
+      }),
+    );
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "Respondent options saved." };
 }
 
 export async function setQuizStatusAction(quizId: number, status: "draft" | "published"): Promise<FormState> {
