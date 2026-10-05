@@ -24,10 +24,32 @@ const OPTIONS: sanitizeHtml.IOptions = {
   },
 };
 
-/** Cleans authored HTML. Returns null for empty content (e.g. a lone empty paragraph). */
-export function sanitizeRichText(html: string | null | undefined): string | null {
+/** For respondents: links to other sites open in a new tab (spec: off-site links). */
+const EXTERNAL_OPTIONS: sanitizeHtml.IOptions = {
+  ...OPTIONS,
+  transformTags: {
+    ...OPTIONS.transformTags,
+    a: (tagName, attribs) => {
+      const href = attribs.href ?? "";
+      const offSite = /^https?:\/\//i.test(href);
+      return {
+        tagName,
+        attribs: {
+          href,
+          ...(offSite || attribs.target === "_blank" ? { target: "_blank", rel: "noopener noreferrer" } : {}),
+        },
+      };
+    },
+  },
+};
+
+/**
+ * Cleans authored HTML. Returns null for empty content (e.g. a lone empty paragraph).
+ * `external`: absolute http(s) links open in a new tab (use for what respondents see).
+ */
+export function sanitizeRichText(html: string | null | undefined, opts: { external?: boolean } = {}): string | null {
   if (!html) return null;
-  const clean = sanitizeHtml(html, OPTIONS).trim();
+  const clean = sanitizeHtml(html, opts.external ? EXTERNAL_OPTIONS : OPTIONS).trim();
   const text = sanitizeHtml(clean, { allowedTags: [], allowedAttributes: {} }).replace(/&nbsp;/g, " ").trim();
   return text ? clean : null;
 }

@@ -30,12 +30,16 @@ export function QuestionView({
   busy: boolean;
   /** A message from the controller (e.g. submit failed). */
   error: string | null;
-  onSelect: (answerIds: number[]) => void;
+  /** `fromArrowKey`: the browser moved a radio selection with an arrow key (never auto-advance on that). */
+  onSelect: (answerIds: number[], how: { fromArrowKey: boolean }) => void;
   onBack: (() => void) | null;
   onNext: () => void;
 }) {
   const uid = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  /** Whether the latest key or pointer action in this question was an arrow key. */
+  const lastWasArrow = useRef(false);
   const [showProblem, setShowProblem] = useState(false);
   const problem = selectionProblem(question, selected);
   // Over the maximum shows straight away; other problems wait for Next.
@@ -45,13 +49,18 @@ export function QuestionView({
   const multi = question.type === "multi";
 
   // Move focus to the new question so keyboard and screen-reader users start there.
+  // Sent back with a problem (e.g. a missing answer on submit)? Focus its first answer,
+  // so the label, question and error are read together.
+  const openedWithError = useRef(Boolean(error));
   useEffect(() => {
-    headingRef.current?.focus({ preventScroll: false });
+    if (openedWithError.current) firstInputRef.current?.focus();
+    else headingRef.current?.focus();
   }, []);
 
   const toggle = (answerId: number, checked: boolean) => {
-    if (!multi) return onSelect([answerId]);
-    onSelect(checked ? [...selected, answerId] : selected.filter((id) => id !== answerId));
+    const how = { fromArrowKey: lastWasArrow.current };
+    if (!multi) return onSelect([answerId], how);
+    onSelect(checked ? [...selected, answerId] : selected.filter((id) => id !== answerId), how);
   };
 
   return (
@@ -66,6 +75,12 @@ export function QuestionView({
       className="flex flex-col gap-6"
     >
       <fieldset
+        onKeyDown={(e) => {
+          lastWasArrow.current = e.key.startsWith("Arrow");
+        }}
+        onPointerDown={() => {
+          lastWasArrow.current = false;
+        }}
         aria-describedby={[question.helpHtml ? helpId : null, message ? messageId : null].filter(Boolean).join(" ") || undefined}
         aria-invalid={message ? true : undefined}
         className="flex flex-col gap-4"
@@ -89,7 +104,7 @@ export function QuestionView({
         )}
 
         <div className="flex flex-col gap-3">
-          {question.answers.map((answer) => {
+          {question.answers.map((answer, i) => {
             const inputId = `${uid}-a${answer.id}`;
             const detailsId = `${inputId}-details`;
             const checked = selected.includes(answer.id);
@@ -101,12 +116,14 @@ export function QuestionView({
                 <label htmlFor={inputId} className="flex cursor-pointer items-start gap-3">
                   <input
                     id={inputId}
+                    ref={i === 0 ? firstInputRef : undefined}
                     type={multi ? "checkbox" : "radio"}
                     name={`q${question.id}`}
                     value={answer.id}
                     checked={checked}
                     onChange={(e) => toggle(answer.id, e.target.checked)}
-                    aria-describedby={answer.bodyHtml ? detailsId : undefined}
+                    // Also point at the error: fieldset descriptions aren't read everywhere.
+                    aria-describedby={[answer.bodyHtml ? detailsId : null, message ? messageId : null].filter(Boolean).join(" ") || undefined}
                     className="mt-1 size-5 shrink-0 accent-brand focus-visible:outline-none"
                   />
                   <span className={`text-lg ${checked ? "font-semibold" : ""}`}>{answer.label}</span>
@@ -138,7 +155,7 @@ export function QuestionView({
         <button
           type="submit"
           disabled={busy}
-          className="ml-auto rounded-md bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          className="ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
           {nextLabel}
         </button>

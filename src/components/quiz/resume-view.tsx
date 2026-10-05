@@ -41,7 +41,7 @@ export function ResumeView({
           type="button"
           onClick={onResume}
           disabled={busy}
-          className="rounded-md bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          className="rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
           Resume
         </button>

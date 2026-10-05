@@ -67,9 +67,11 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     };
   }, [api, resultAttempt]);
 
+  // A pending auto-advance belongs to the question it was set on: drop it as soon as
+  // the respondent moves (Next, Back, review) so it can't skip a question.
   useEffect(() => () => {
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
-  }, []);
+  }, [state.index, state.phase]);
 
   /* --------------------------------- Save -------------------------------- */
 
@@ -108,7 +110,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     return running.current;
   }, [api]);
 
-  const select = (answerIds: number[]) => {
+  const select = (answerIds: number[], how: { fromArrowKey: boolean } = { fromArrowKey: false }) => {
     const question = currentQuestion(state);
     if (!question) return;
     dispatch({ type: "select", questionId: question.id, answerIds });
@@ -119,8 +121,11 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
 
     // Optional auto-advance for single-choice questions; Next is always there too.
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
-    if (state.quiz?.settings.autoAdvance && question.type === "single" && answerIds.length === 1) {
-      advanceTimer.current = setTimeout(() => dispatch({ type: "next" }), 400);
+    // Never on arrow keys: in a radio group they move the selection, and moving on
+    // would stop keyboard users from reaching the other answers.
+    if (state.quiz?.settings.autoAdvance && question.type === "single" && answerIds.length === 1 && !how.fromArrowKey) {
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      advanceTimer.current = setTimeout(() => dispatch({ type: "next" }), reduce ? 0 : 400);
     }
   };
 
@@ -185,6 +190,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       <p aria-live="polite" className="sr-only">
         {state.phase === "question" && question ? `Question ${state.index + 1} of ${total}` : ""}
         {state.phase === "review" ? "Check your answers before seeing your result." : ""}
+        {state.phase === "submitting" ? "Working out your result…" : ""}
         {state.phase === "result" ? "Your result is ready." : ""}
       </p>
 
@@ -196,7 +202,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
               type="button"
               onClick={() => dispatch({ type: "start" })}
               disabled={state.phase === "loading"}
-              className="rounded-md bg-brand px-6 py-3 text-lg font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+              className="rounded-md border border-transparent bg-brand px-6 py-3 text-lg font-medium text-white hover:bg-brand-strong disabled:opacity-60"
             >
               {state.phase === "loading" ? "Loading…" : "Start"}
             </button>

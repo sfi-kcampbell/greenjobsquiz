@@ -83,7 +83,7 @@ export function ReviewView({
           type="button"
           onClick={onSubmit}
           disabled={busy}
-          className="ml-auto rounded-md bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          className="ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
           {busy ? "Working out your result…" : "See my result"}
         </button>

@@ -78,3 +78,16 @@ body {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* Windows High Contrast / forced colors: backgrounds are dropped, so bars need an
+   outline and a system-colour fill. (Buttons get a transparent border, which
+   forced colors turns visible.) */
+@media (forced-colors: active) {
+  .meter-track {
+    border: 1px solid CanvasText;
+  }
+  .meter-fill {
+    forced-color-adjust: none;
+    background-color: Highlight !important;
+  }
+}

@@ -92,8 +92,8 @@ function Toolbar({ editor, label }: { editor: Editor; label: string }) {
       {button("Bold", <strong>B</strong>, state.bold, () => editor.chain().focus().toggleBold().run())}
       {button("Italic", <em>I</em>, state.italic, () => editor.chain().focus().toggleItalic().run())}
       {button("Underline", <u>U</u>, state.underline, () => editor.chain().focus().toggleUnderline().run())}
-      {button("Bulleted list", "• List", state.bulletList, () => editor.chain().focus().toggleBulletList().run())}
-      {button("Numbered list", "1. List", state.orderedList, () => editor.chain().focus().toggleOrderedList().run())}
+      {button("Bulleted list", "Bulleted", state.bulletList, () => editor.chain().focus().toggleBulletList().run())}
+      {button("Numbered list", "Numbered", state.orderedList, () => editor.chain().focus().toggleOrderedList().run())}
       {button("Link", "Link", state.link, editLink)}
       {button("Clear formatting", "Clear", false, () => editor.chain().focus().unsetAllMarks().clearNodes().run())}
     </div>

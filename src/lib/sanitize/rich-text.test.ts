@@ -24,6 +24,14 @@ describe("sanitizeRichText", () => {
     );
   });
 
+  it("opens off-site links in a new tab for respondents only", () => {
+    const html = '<p><a href="https://example.org">Out</a> <a href="/quizzes/x">In</a> <a href="mailto:a@b.org">Mail</a></p>';
+    expect(sanitizeRichText(html, { external: true })).toBe(
+      '<p><a href="https://example.org" target="_blank" rel="noopener noreferrer">Out</a> <a href="/quizzes/x">In</a> <a href="mailto:a@b.org">Mail</a></p>',
+    );
+    expect(sanitizeRichText(html)).toBe(html);
+  });
+
   it("returns null for empty content", () => {
     expect(sanitizeRichText("")).toBeNull();
     expect(sanitizeRichText(null)).toBeNull();
