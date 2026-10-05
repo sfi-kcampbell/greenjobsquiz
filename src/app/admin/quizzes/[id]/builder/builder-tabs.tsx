@@ -18,7 +18,7 @@ export function BuilderTabs({ quizId }: { quizId: number }) {
       <ul className="-mb-px flex flex-wrap gap-1">
         {TABS.map((tab) => {
           const href = `/admin/quizzes/${quizId}/builder/${tab.slug}`;
-          const active = pathname === href;
+          const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <li key={tab.slug}>
               <Link

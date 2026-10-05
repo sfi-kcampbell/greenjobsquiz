@@ -3,13 +3,17 @@
 import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useId, type KeyboardEvent } from "react";
+import { useId } from "react";
 import { useSortSensors } from "@/components/builder/hooks";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { MAX_ANSWERS } from "@/lib/content/validation";
 import {
+  CategoryHeaderCells,
   cellValue,
-  clampWeight,
+  formatWeight as fmt,
+  WeightCell,
+} from "@/components/builder/weight-matrix";
+import {
   emptyAnswer,
   type AnswerRow,
   type Card,
@@ -28,7 +32,6 @@ type Props = {
   onDelete: () => void;
 };
 
-const fmt = (n: number) => String(Math.round(n * 100) / 100);
 
 export function QuestionCard({ card, index, categories, open, onToggle, onPatch, onEdit, onSave, onDelete }: Props) {
   const unsaved = card.id === null;
@@ -315,29 +318,6 @@ function AnswerMatrix({
     }));
   }
 
-  /** Arrow keys move between weight cells; Shift+↑/↓ changes the value. */
-  function onCellKeyDown(event: KeyboardEvent<HTMLInputElement>, row: number, col: number, answer: AnswerRow, categoryId: number) {
-    const { key, shiftKey } = event;
-    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) return;
-    event.preventDefault();
-    if (shiftKey && (key === "ArrowUp" || key === "ArrowDown")) {
-      const next = clampWeight(Math.round(cellValue(answer.cells[categoryId])) + (key === "ArrowUp" ? 1 : -1));
-      setAnswer(answer.key, (a) => ({ ...a, cells: { ...a.cells, [categoryId]: String(next) } }));
-      return;
-    }
-    const target = {
-      ArrowUp: [row - 1, col],
-      ArrowDown: [row + 1, col],
-      ArrowLeft: [row, col - 1],
-      ArrowRight: [row, col + 1],
-    }[key]!;
-    const cell = document.querySelector<HTMLInputElement>(
-      `[data-matrix="${card.key}"][data-row="${target[0]}"][data-col="${target[1]}"]`,
-    );
-    cell?.focus();
-    cell?.select();
-  }
-
   return (
     <div className="flex flex-col gap-2">
       <div className="overflow-x-auto rounded-md border border-border">
@@ -354,19 +334,7 @@ function AnswerMatrix({
                 <th scope="col" className="sticky left-0 z-10 min-w-56 bg-surface px-2 py-2 text-left font-medium">
                   Answer
                 </th>
-                {categories.map((c) => (
-                  <th
-                    key={c.id}
-                    scope="col"
-                    title={c.name}
-                    style={{ borderTopColor: c.color }}
-                    className="border-t-4 px-1 py-2 text-center font-medium"
-                  >
-                    <abbr title={c.name} className="no-underline">
-                      {c.abbr}
-                    </abbr>
-                  </th>
-                ))}
+                <CategoryHeaderCells categories={categories} />
                 <th scope="col" className="px-2 py-2 text-center font-medium">
                   Total
                 </th>
@@ -390,7 +358,6 @@ function AnswerMatrix({
                     onCell={(categoryId, text) =>
                       setAnswer(answer.key, (a) => ({ ...a, cells: { ...a.cells, [categoryId]: text } }))
                     }
-                    onCellKeyDown={(e, col, categoryId) => onCellKeyDown(e, row, col, answer, categoryId)}
                     onToggleBody={() => patchAnswer(answer.key, (a) => ({ ...a, bodyOpen: !a.bodyOpen }))}
                     onBody={(html) => setAnswer(answer.key, (a) => ({ ...a, bodyHtml: html }))}
                     onRemove={() => onEdit((c) => ({ ...c, answers: c.answers.filter((a) => a.key !== answer.key) }))}
@@ -446,7 +413,6 @@ function AnswerRowView({
   labelError,
   onLabel,
   onCell,
-  onCellKeyDown,
   onToggleBody,
   onBody,
   onRemove,
@@ -459,7 +425,6 @@ function AnswerRowView({
   labelError?: string;
   onLabel: (label: string) => void;
   onCell: (categoryId: number, text: string) => void;
-  onCellKeyDown: (e: KeyboardEvent<HTMLInputElement>, col: number, categoryId: number) => void;
   onToggleBody: () => void;
   onBody: (html: string) => void;
   onRemove: () => void;
@@ -521,32 +486,18 @@ function AnswerRowView({
             </p>
           )}
         </td>
-        {categories.map((c, col) => {
-          const text = answer.cells[c.id] ?? "";
-          const zero = cellValue(text) === 0;
-          return (
-            <td key={c.id} className="px-1 py-1.5 text-center">
-              <input
-                type="number"
-                step={1}
-                min={-5}
-                max={5}
-                value={text === "" ? "" : text}
-                placeholder="0"
-                data-matrix={cardKey}
-                data-row={row}
-                data-col={col}
-                aria-label={`${c.name} weight for ${label}`}
-                onChange={(e) => onCell(c.id, e.target.value)}
-                onKeyDown={(e) => onCellKeyDown(e, col, c.id)}
-                onFocus={(e) => e.target.select()}
-                className={`weight-cell w-12 rounded-md border border-border bg-surface px-1 py-1 text-center tabular-nums ${
-                  zero ? "text-muted/60" : "font-semibold"
-                }`}
-              />
-            </td>
-          );
-        })}
+        {categories.map((c, col) => (
+          <td key={c.id} className="px-1 py-1.5 text-center">
+            <WeightCell
+              matrix={cardKey}
+              row={row}
+              col={col}
+              text={answer.cells[c.id] ?? ""}
+              label={`${c.name} weight for ${label}`}
+              onText={(text) => onCell(c.id, text)}
+            />
+          </td>
+        ))}
         <td className="px-2 py-1.5 pt-2.5 text-center tabular-nums text-muted">
           {noEffect ? (
             <span className="text-xs text-danger" title="All weights are zero, so this answer doesn't affect the result.">
