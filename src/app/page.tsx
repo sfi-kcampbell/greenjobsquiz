@@ -28,6 +28,13 @@ export default async function Home() {
       ) : (
         <p className="text-muted">Quizzes will appear here once they&apos;re published.</p>
       )}
+      {quizzes.length > 0 && (
+        <p>
+          <Link href="/quizzes" className="text-brand underline underline-offset-4">
+            See all quizzes
+          </Link>
+        </p>
+      )}
       <p>
         <Link href="/admin" className="text-sm text-muted underline underline-offset-4">
           Staff sign-in

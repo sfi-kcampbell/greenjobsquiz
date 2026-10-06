@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { PageShell } from "@/components/quiz/page-shell";
 import { QuizClient } from "@/components/quiz/quiz-client";
 import { RichHtml } from "@/components/quiz/rich-html";
-import { getCachedQuizBySlug } from "@/lib/public/page-cache";
+import { getCachedQuizPage } from "@/lib/public/page-cache";
 
 /**
  * The hosted quiz page. Only the title and intro are rendered here, the same
@@ -18,32 +18,28 @@ export function generateStaticParams() {
 }
 
 async function load(slug: string) {
-  const quiz = await getCachedQuizBySlug(decodeURIComponent(slug));
-  if (!quiz) notFound();
-  return quiz;
+  const info = await getCachedQuizPage(decodeURIComponent(slug));
+  if (!info) notFound();
+  // Headless: the quiz lives on its own front end (307, a temporary redirect).
+  if (info.deliveryMode === "headless") {
+    if (!info.headlessBaseUrl) notFound();
+    redirect(`${info.headlessBaseUrl}/quizzes/${encodeURIComponent(info.quiz.slug)}`);
+  }
+  return info;
 }
 
 export async function generateMetadata({ params }: PageProps<"/quizzes/[slug]">): Promise<Metadata> {
-  const quiz = await load((await params).slug);
-  return { title: quiz.title };
+  // No redirect here: the page does it (redirecting in both sends Location twice).
+  const info = await getCachedQuizPage(decodeURIComponent((await params).slug));
+  return info ? { title: info.quiz.title } : {};
 }
 
 export default async function QuizPage({ params }: PageProps<"/quizzes/[slug]">) {
-  const quiz = await load((await params).slug);
-
+  const { quiz, layoutTemplate } = await load((await params).slug);
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex w-full max-w-2xl items-center px-4 py-3 sm:px-6">
-          <Link href="/" className="font-semibold text-brand">
-            PLT Quiz
-          </Link>
-        </div>
-      </header>
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
-        <h1 className="text-3xl font-semibold sm:text-4xl">{quiz.title}</h1>
-        <QuizClient quizId={quiz.id} intro={<RichHtml html={quiz.introHtml} className="text-lg" />} />
-      </main>
-    </div>
+    <PageShell template={layoutTemplate}>
+      <h1 className="text-3xl font-semibold sm:text-4xl">{quiz.title}</h1>
+      <QuizClient quizId={quiz.id} intro={<RichHtml html={quiz.introHtml} className="text-lg" />} />
+    </PageShell>
   );
 }

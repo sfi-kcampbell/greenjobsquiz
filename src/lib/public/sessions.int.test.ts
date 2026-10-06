@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createCategory } from "@/lib/content/categories";
 import { saveQuestion } from "@/lib/content/questions";
-import { createQuiz, setQuizStatus } from "@/lib/content/quizzes";
+import { createQuiz, setQuizStatus, updateQuizDelivery } from "@/lib/content/quizzes";
 import { saveResponseRow, updateResponseDetails } from "@/lib/content/responses";
 import { questionInput, responseDetailsInput } from "@/lib/content/validation";
 import type { Database } from "@/lib/db/create";
@@ -10,7 +10,7 @@ import { quizSessions, results, submissionAnswers, submissions } from "@/lib/db/
 import { resetTestDb, setupTestDb, teardownTestDb, TEST_DATABASE_URL } from "@/test/db";
 import { PublicError } from "./errors";
 import { getResultByShareToken, getSessionView, listAttempts, restart, saveAnswers, submit } from "./sessions";
-import { getPublishedQuiz, listPublishedQuizzes, type PublicQuiz } from "./structure";
+import { getPublishedQuiz, getPublishedQuizPage, listPublishedQuizzes, type PublicQuiz } from "./structure";
 
 async function expectPublicError(promise: Promise<unknown>, status: number, code: string) {
   const error = await promise.then(
@@ -86,6 +86,20 @@ describe.skipIf(!TEST_DATABASE_URL)("public: structure and sessions (Postgres)",
     await setQuizStatus(db, quizId, "draft");
     expect(await getPublishedQuiz(db, { id: quizId })).toBeNull();
     expect(await listPublishedQuizzes(db)).toEqual([]);
+  });
+
+  it("gives pages the delivery settings; hosted-only lists skip headless quizzes", async () => {
+    expect(await getPublishedQuizPage(db, "green-jobs")).toMatchObject({
+      quiz: { id: quizId },
+      deliveryMode: "hosted",
+      headlessBaseUrl: null,
+      layoutTemplate: "default",
+    });
+    await updateQuizDelivery(db, quizId, { layout: "stepped", layoutTemplate: "canvas", deliveryMode: "headless", headlessBaseUrl: "https://app.example.org" });
+    expect(await getPublishedQuizPage(db, "green-jobs")).toMatchObject({ deliveryMode: "headless", headlessBaseUrl: "https://app.example.org", layoutTemplate: "canvas" });
+    expect(await listPublishedQuizzes(db, { hostedOnly: true })).toEqual([]);
+    expect(await listPublishedQuizzes(db)).toHaveLength(1); // the API still lists it
+    expect(await getPublishedQuizPage(db, "nope")).toBeNull();
   });
 
   it("creates nothing on read, and the session on the first write", async () => {

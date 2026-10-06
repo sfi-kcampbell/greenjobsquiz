@@ -265,3 +265,70 @@ export const quizRespondentInput = z.object({
   retakeAllowed: z.boolean(),
 });
 export type QuizRespondentInput = z.infer<typeof quizRespondentInput>;
+
+/* -------------------------------- Delivery ------------------------------ */
+
+/** https, or http on localhost (development). */
+const isWebUrl = (v: string) => {
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" || (u.protocol === "http:" && ["localhost", "127.0.0.1"].includes(u.hostname));
+  } catch {
+    return false;
+  }
+};
+
+export const quizDeliveryInput = z
+  .object({
+    layout: z.enum(["stepped", "single_page"]),
+    layoutTemplate: z.enum(["default", "canvas"]),
+    deliveryMode: z.enum(["hosted", "headless"]),
+    headlessBaseUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .transform((v) => v.replace(/\/+$/, "") || null),
+  })
+  .superRefine((d, ctx) => {
+    if (d.deliveryMode !== "headless") return; // the address is only checked when it's used
+    if (!d.headlessBaseUrl) {
+      ctx.addIssue({ code: "custom", path: ["headlessBaseUrl"], message: "Headless delivery needs the address of your front end." });
+    } else if (!isWebUrl(d.headlessBaseUrl)) {
+      ctx.addIssue({ code: "custom", path: ["headlessBaseUrl"], message: "Enter a full web address starting with https://" });
+    }
+  })
+  // A leftover, unchecked address is dropped when hosted.
+  .transform((d) => (d.deliveryMode === "hosted" && d.headlessBaseUrl && !isWebUrl(d.headlessBaseUrl) ? { ...d, headlessBaseUrl: null } : d));
+export type QuizDeliveryInput = z.infer<typeof quizDeliveryInput>;
+
+/** "https://Example.org/" → "https://example.org". Null if it isn't a bare origin. */
+export function normalizeOrigin(value: string): string | null {
+  const v = value.trim();
+  if (!isWebUrl(v)) return null;
+  const u = new URL(v);
+  if ((u.pathname !== "/" && u.pathname !== "") || u.search || u.hash || u.username) return null;
+  if (!/^https?:\/\/[^/]+\/?$/i.test(v)) return null;
+  return u.origin.toLowerCase();
+}
+
+/** One origin per line; blank lines ignored; duplicates removed. */
+export const originList = z.string().transform((text, ctx) => {
+  const out: string[] = [];
+  for (const [i, line] of text.split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    const origin = normalizeOrigin(line);
+    if (!origin) {
+      ctx.addIssue({ code: "custom", message: `Line ${i + 1}: “${line.trim()}” isn't a site address like https://example.org (no path).` });
+      continue;
+    }
+    if (!out.includes(origin)) out.push(origin);
+  }
+  if (out.length > 50) ctx.addIssue({ code: "custom", message: "Keep it to 50 sites or fewer." });
+  return out;
+});
+
+export const accessSettingsInput = z.object({
+  embedOrigins: originList,
+  corsOrigins: originList,
+});
+export type AccessSettingsInput = z.infer<typeof accessSettingsInput>;
