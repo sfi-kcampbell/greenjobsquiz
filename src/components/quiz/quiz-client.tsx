@@ -1,29 +1,55 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
-import { ApiError, quizApi, type Answers } from "./api";
+import { ApiError, quizApi, type Answers, type SessionResponse } from "./api";
 import { errorMessage, saveErrorMessage } from "./messages";
 import { Progress } from "./progress";
 import { QuestionView } from "./question-view";
 import { ResultView } from "./result-view";
 import { ResumeView } from "./resume-view";
 import { ReviewView } from "./review-view";
+import { SaveQueue } from "./save-queue";
 import { answeredCount, currentQuestion, firstProblem, initialState, isSavable, quizReducer } from "./state";
 
-type PendingSave = { answerIds: number[]; currentIndex: number };
+const answeredIn = (answers: Answers) => Object.values(answers).filter((ids) => ids.length > 0).length;
+
+/** The server's session with queued (not yet saved) picks on top. */
+function withQueued(session: SessionResponse, queued: Answers): SessionResponse {
+  if (Object.keys(queued).length === 0) return session;
+  const answers = { ...session.answers, ...queued };
+  return {
+    ...session,
+    answers,
+    answeredCount: answeredIn(answers),
+    status: session.status === "none" ? "in_progress" : session.status,
+  };
+}
 
 /**
  * The respondent client. All state comes from /api/v1 (never from the cached
- * page HTML). Answers save in the background, one request at a time, keeping
- * only the latest pick per question.
+ * page HTML). Answers go through a SaveQueue: debounced, one request at a
+ * time, retried with backoff, mirrored to sessionStorage and flushed with
+ * sendBeacon when the page goes away.
  */
 export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode }) {
   const api = useMemo(() => quizApi(quizId), [quizId]);
   const [state, dispatch] = useReducer(quizReducer, initialState);
   const rootRef = useRef<HTMLDivElement>(null);
-  const pending = useRef(new Map<number, PendingSave>());
-  const revision = useRef(0);
-  const running = useRef<Promise<void> | null>(null);
+  const queue = useMemo(
+    () =>
+      new SaveQueue({
+        send: (questionId, entry, clientRevision) =>
+          api.saveAnswer({ questionId, answerIds: entry.answerIds, clientRevision, currentIndex: entry.currentIndex }),
+        // Stale: another tab or an old page wrote too. The server's set wins, except for picks still queued here.
+        onSaved: (res, overlay) =>
+          dispatch({ type: "saved", revision: res.revision, answers: res.stale && res.answers ? { ...res.answers, ...overlay } : undefined }),
+        onGaveUp: (error) => dispatch({ type: "save_failed", message: saveErrorMessage(error) }),
+        onDropped: (error) => dispatch({ type: "save_failed", message: saveErrorMessage(error) }),
+        storage: typeof window === "undefined" ? null : safeSessionStorage(),
+        storageKey: `pltq:pending:${quizId}`,
+      }),
+    [api, quizId],
+  );
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const emit = useCallback((name: string, detail: Record<string, unknown>) => {
@@ -38,12 +64,17 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     (async () => {
       try {
         // In parallel: the structure is cacheable, the session never is.
-        const [quiz, session] = await Promise.all([api.structure(), api.session()]);
+        const [quiz, fetched] = await Promise.all([api.structure(), api.session()]);
         const result =
-          session.status === "completed" && session.result ? (await api.result(session.result.shareToken)).result : null;
+          fetched.status === "completed" && fetched.result ? (await api.result(fetched.result.shareToken)).result : null;
         if (cancelled) return;
-        revision.current = session.revision;
-        dispatch({ type: "loaded", quiz, session, result });
+        queue.sync(fetched.revision);
+        // Picks that hadn't reached the server before the last reload or crash.
+        let queued: Answers = {};
+        if (fetched.status === "completed") queue.clear();
+        else queued = queue.restore(fetched.attemptNo);
+        dispatch({ type: "loaded", quiz, session: withQueued(fetched, queued), result });
+        if (queue.size > 0) queue.flushNow().catch(() => {});
       } catch (error) {
         if (!cancelled) dispatch({ type: "load_failed", message: errorMessage(error) });
       }
@@ -51,7 +82,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     return () => {
       cancelled = true;
     };
-  }, [api, state.phase]);
+  }, [api, queue, state.phase]);
 
   // Earlier attempts, shown under the result.
   const resultAttempt = state.result?.attemptNo;
@@ -75,40 +106,52 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
 
   /* --------------------------------- Save -------------------------------- */
 
-  /** Sends queued answers one at a time. Rejects if a save fails (the entry stays queued). */
-  const flush = useCallback((): Promise<void> => {
-    if (running.current) return running.current;
-    const run = (async () => {
-      while (pending.current.size > 0) {
-        const [questionId, entry] = pending.current.entries().next().value as [number, PendingSave];
-        let res;
-        try {
-          res = await api.saveAnswer({
-            questionId,
-            answerIds: entry.answerIds,
-            clientRevision: revision.current,
-            currentIndex: entry.currentIndex,
-          });
-        } catch (error) {
-          dispatch({ type: "save_failed", message: saveErrorMessage(error) });
-          throw error;
-        }
-        // A newer pick for the same question may have been queued meanwhile.
-        if (pending.current.get(questionId) === entry) pending.current.delete(questionId);
-        revision.current = res.revision;
-        let answers: Answers | undefined;
-        if (res.stale && res.answers) {
-          answers = { ...res.answers };
-          for (const [id, p] of pending.current) answers[String(id)] = p.answerIds;
-        }
-        dispatch({ type: "saved", revision: res.revision, answers });
+  // Back online: send what's waiting straight away.
+  useEffect(() => {
+    const online = () => queue.flushNow().catch(() => {});
+    window.addEventListener("online", online);
+    return () => {
+      window.removeEventListener("online", online);
+      queue.dispose();
+    };
+  }, [queue]);
+
+  // Leaving (tab closed, app switched, navigated away): hand the queue to sendBeacon.
+  useEffect(() => {
+    const url = `/api/v1/quizzes/${quizId}/session/answers`;
+    const flushOnExit = () => {
+      if (typeof navigator.sendBeacon === "function") queue.beacon(url, (u, data) => navigator.sendBeacon(u, data));
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushOnExit();
+    };
+    window.addEventListener("pagehide", flushOnExit);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flushOnExit);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [queue, quizId]);
+
+  // Back/forward cache: the page is restored as it was, but the attempt may have moved on.
+  useEffect(() => {
+    const onPageShow = async (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      await queue.flushNow().catch(() => {});
+      try {
+        const fetched = await api.session();
+        const result =
+          fetched.status === "completed" && fetched.result ? (await api.result(fetched.result.shareToken)).result : null;
+        if (fetched.status === "completed") queue.clear();
+        queue.sync(fetched.revision);
+        dispatch({ type: "refreshed", session: withQueued(fetched, queue.overlay()), result });
+      } catch {
+        // Offline: keep what's on screen; the queue retries on its own.
       }
-    })();
-    running.current = run.finally(() => {
-      running.current = null;
-    });
-    return running.current;
-  }, [api]);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [api, queue]);
 
   const select = (answerIds: number[], how: { fromArrowKey: boolean } = { fromArrowKey: false }) => {
     const question = currentQuestion(state);
@@ -116,8 +159,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     dispatch({ type: "select", questionId: question.id, answerIds });
     emit("quiz:answer", { questionId: question.id, answerIds });
     if (!isSavable(question, answerIds)) return; // e.g. a multi-select below its minimum
-    pending.current.set(question.id, { answerIds, currentIndex: state.index });
-    flush().catch(() => {});
+    queue.set(question.id, answerIds, state.index);
 
     // Optional auto-advance for single-choice questions; Next is always there too.
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
@@ -135,11 +177,11 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
   const restart = async () => {
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
     dispatch({ type: "restart" });
-    pending.current.clear();
-    await running.current?.catch(() => {});
+    queue.clear();
+    await queue.settle();
     try {
       const session = await api.restart();
-      revision.current = session.revision;
+      queue.sync(session.revision, session.attemptNo);
       dispatch({ type: "restarted", revision: session.revision });
       emit("quiz:restart", { attemptNo: session.attemptNo });
     } catch (error) {
@@ -156,7 +198,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     }
     dispatch({ type: "submit" });
     try {
-      await flush();
+      await queue.flushNow();
     } catch (error) {
       dispatch({ type: "submit_failed", message: saveErrorMessage(error) });
       return;
@@ -232,7 +274,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
           {state.saveError && (
             <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-danger/40 bg-danger/5 px-4 py-2 text-sm">
               <span>{state.saveError}</span>
-              <button type="button" onClick={() => flush().catch(() => {})} className="font-medium text-danger underline underline-offset-4">
+              <button type="button" onClick={() => queue.flushNow().catch(() => {})} className="font-medium text-danger underline underline-offset-4">
                 Retry
               </button>
             </div>
@@ -289,4 +331,13 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       )}
     </div>
   );
+}
+
+/** sessionStorage, or null where it's blocked (some private modes throw on access). */
+function safeSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
 }
