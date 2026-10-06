@@ -25,11 +25,11 @@ export type ScoringBundle = {
 export async function loadScoringBundle(db: Executor, quizId: number): Promise<ScoringBundle> {
   const quiz = await getQuiz(db, quizId);
   if (!quiz) throw new ContentError("not_found", "That quiz no longer exists.");
-  const [cats, questions, responses] = await Promise.all([
-    listCategories(db, quizId),
-    listQuestions(db, quizId),
-    listResponses(db, quizId),
-  ]);
+  // One after another: `db` may be a transaction, whose single connection
+  // can't run queries concurrently (pg warns now and will refuse in pg 9).
+  const cats = await listCategories(db, quizId);
+  const questions = await listQuestions(db, quizId);
+  const responses = await listResponses(db, quizId);
 
   const settings = {
     runnersUpCount: quiz.runnersUpCount,
