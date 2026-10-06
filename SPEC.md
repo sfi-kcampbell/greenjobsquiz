@@ -635,7 +635,7 @@ too.
   revalidated by tag. Layout templates are `default` (site header and footer) and `canvas`
   (distraction-free), chosen per quiz from a fixed list.
 - **Index:** `/quizzes` lists every published quiz.
-- **Headless mode:** a quiz with `delivery_mode = headless` gets a 302 to
+- **Headless mode:** a quiz with `delivery_mode = headless` gets a temporary redirect (Next.js sends 307, which keeps the method) to
   `{headless_base_url}/quizzes/{slug}` (done in middleware or the page). If no base URL is set it
   returns 404.
 - **No JSON here:** these human URLs never serve JSON. JSON lives under `/api/v1`.

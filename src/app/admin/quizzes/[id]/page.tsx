@@ -4,8 +4,10 @@ import { ConfigWarning } from "@/components/config-warning";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
+import { requestOrigin } from "@/lib/app-url";
 import { healthReport } from "@/lib/scoring/health";
 import { loadBundle, loadQuiz } from "./load";
+import { DeliveryForm, EmbedSnippet } from "./delivery-form";
 import { PublishControl } from "./publish-control";
 import { RespondentForm } from "./respondent-form";
 import { ScoringForm } from "./scoring-form";
@@ -55,6 +57,25 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         </h2>
         <ConfigWarning />
         <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} pageUrl={pageUrl} />
+      </section>
+
+      <section aria-labelledby="delivery" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="delivery" className="font-semibold">
+          Delivery
+        </h2>
+        <DeliveryForm
+          quizId={quiz.id}
+          slug={quiz.slug}
+          values={{
+            layout: quiz.layout,
+            layoutTemplate: quiz.layoutTemplate,
+            deliveryMode: quiz.deliveryMode,
+            headlessBaseUrl: quiz.headlessBaseUrl,
+          }}
+        />
+        {quiz.status === "published" && quiz.deliveryMode === "hosted" && (
+          <EmbedSnippet origin={await requestOrigin()} slug={quiz.slug} title={quiz.title} />
+        )}
       </section>
 
       <section aria-labelledby="respondents" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">

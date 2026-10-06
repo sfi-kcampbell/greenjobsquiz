@@ -7,7 +7,8 @@ import { resetTestDb, setupTestDb, teardownTestDb, TEST_DATABASE_URL } from "@/t
 import { createCategory } from "./categories";
 import { ContentError } from "./errors";
 import { saveQuestion } from "./questions";
-import { createQuiz, getQuiz, updateQuizRespondentOptions, updateQuizScoring } from "./quizzes";
+import { createQuiz, getQuiz, updateQuizDelivery, updateQuizRespondentOptions, updateQuizScoring } from "./quizzes";
+import { getAccessSettings, updateAccessSettings } from "./settings";
 import { saveResponseRow } from "./responses";
 import { loadScoringBundle } from "./scoring-model";
 import { questionInput } from "./validation";
@@ -85,6 +86,31 @@ describe.skipIf(!TEST_DATABASE_URL)("content: scoring model (Postgres)", () => {
     const quiz = (await getQuiz(db, quizId))!;
     expect([quiz.showProgress, quiz.autoAdvance, quiz.retakeAllowed]).toEqual([false, true, false]);
     expect(quiz.structureVersion).toBe(v0 + 1);
+  });
+
+  it("updates delivery settings and bumps the structure version", async () => {
+    const v0 = (await getQuiz(db, quizId))!.structureVersion;
+    await updateQuizDelivery(db, quizId, {
+      layout: "single_page",
+      layoutTemplate: "canvas",
+      deliveryMode: "headless",
+      headlessBaseUrl: "https://app.example.org",
+    });
+    const quiz = (await getQuiz(db, quizId))!;
+    expect([quiz.layout, quiz.layoutTemplate, quiz.deliveryMode, quiz.headlessBaseUrl]).toEqual([
+      "single_page",
+      "canvas",
+      "headless",
+      "https://app.example.org",
+    ]);
+    expect(quiz.structureVersion).toBe(v0 + 1);
+  });
+
+  it("reads defaults, then creates and updates the settings row", async () => {
+    expect(await getAccessSettings(db)).toEqual({ embedOrigins: [], corsOrigins: [] });
+    await updateAccessSettings(db, { embedOrigins: ["https://a.org"], corsOrigins: [] });
+    await updateAccessSettings(db, { embedOrigins: ["https://b.org"], corsOrigins: ["https://c.org"] });
+    expect(await getAccessSettings(db)).toEqual({ embedOrigins: ["https://b.org"], corsOrigins: ["https://c.org"] });
   });
 
   it("updates scoring settings and rejects a fallback from another quiz", async () => {

@@ -1,7 +1,7 @@
 import "server-only";
 import { unstable_cache, updateTag } from "next/cache";
 import { db } from "@/lib/db/client";
-import { getPublishedQuiz, listPublishedQuizzes } from "./structure";
+import { getPublishedQuizPage, listPublishedQuizzes } from "./structure";
 
 /**
  * Cached reads for the public quiz pages (title, intro, structure: the same
@@ -10,19 +10,20 @@ import { getPublishedQuiz, listPublishedQuizzes } from "./structure";
  */
 export const QUIZ_PAGES_TAG = "quiz-pages";
 
-export const getCachedQuizBySlug = unstable_cache(
-  async (slug: string) => getPublishedQuiz(db, { slug }),
-  ["public-quiz-by-slug"],
+export const getCachedQuizPage = unstable_cache(
+  async (slug: string) => getPublishedQuizPage(db, slug),
+  ["public-quiz-page"],
   { tags: [QUIZ_PAGES_TAG], revalidate: 300 },
 );
 
+/** Hosted quizzes only: headless ones live on their own front end. */
 export const getCachedPublishedQuizzes = unstable_cache(
-  async () => listPublishedQuizzes(db),
-  ["public-quiz-list"],
+  async () => listPublishedQuizzes(db, { hostedOnly: true }),
+  ["public-hosted-quiz-list"],
   { tags: [QUIZ_PAGES_TAG], revalidate: 300 },
 );
 
-/** Call from server actions after a change to a quiz's title, slug, intro or status. */
+/** Call from server actions after a change to a quiz's title, slug, intro, status or delivery. */
 export function expireQuizPages() {
   updateTag(QUIZ_PAGES_TAG);
 }

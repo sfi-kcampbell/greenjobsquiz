@@ -40,12 +40,32 @@ export type PublicQuiz = {
   questions: PublicQuestion[];
 };
 
-export async function listPublishedQuizzes(db: Executor) {
+/** Published quizzes (the API lists all; pages pass `hostedOnly` to skip headless ones). */
+export async function listPublishedQuizzes(db: Executor, opts: { hostedOnly?: boolean } = {}) {
   return db
     .select({ id: quizzes.id, slug: quizzes.slug, title: quizzes.title })
     .from(quizzes)
-    .where(eq(quizzes.status, "published"))
+    .where(and(eq(quizzes.status, "published"), opts.hostedOnly ? eq(quizzes.deliveryMode, "hosted") : undefined))
     .orderBy(asc(quizzes.title));
+}
+
+export type QuizPageInfo = {
+  quiz: PublicQuiz;
+  deliveryMode: "hosted" | "headless";
+  headlessBaseUrl: string | null;
+  layoutTemplate: "default" | "canvas";
+};
+
+/** What the hosted and embed pages need: the public quiz plus how it's delivered. */
+export async function getPublishedQuizPage(db: Executor, slug: string): Promise<QuizPageInfo | null> {
+  const quiz = await getPublishedQuiz(db, { slug });
+  if (!quiz) return null;
+  const [row] = await db
+    .select({ deliveryMode: quizzes.deliveryMode, headlessBaseUrl: quizzes.headlessBaseUrl, layoutTemplate: quizzes.layoutTemplate })
+    .from(quizzes)
+    .where(eq(quizzes.id, quiz.id))
+    .limit(1);
+  return { quiz, ...row };
 }
 
 /** Only published quizzes; drafts look exactly like missing ones. */

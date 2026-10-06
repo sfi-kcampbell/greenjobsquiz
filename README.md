@@ -16,6 +16,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 7** (Full quiz flow): multi-select limits (nothing is disabled; going over the maximum shows a message straight away), a "Check your answers" review step with Change links, client-side checks that jump to the first unanswered required question, a "Welcome back — Resume / Start over" prompt, "Take it again" with earlier results listed under the result, and Respondent options in quiz settings (progress bar, auto-advance for single-choice questions, retakes).
 - **Phase 8** (Accessibility): an axe-core audit of every respondent screen and the main admin screens (no violations), a keyboard-only run of the whole quiz, and fixes: auto-advance never fires on arrow keys, a missing answer on submit puts focus on that question's first answer, errors are attached to each input, off-site links in quiz content open in a new tab, bars and buttons stay visible in Windows High Contrast, and reduced motion removes the auto-advance delay. Screen-reader checklist below.
 - **Phase 9** (Resilience): answers go through an outbox (`src/components/quiz/save-queue.ts`) that waits 250 ms to merge quick changes, sends one request at a time, retries at 1, 2, 4, 8, 16 and 30 seconds (honouring `Retry-After`) and only then shows "couldn't save — Retry". It's mirrored to `sessionStorage` so a reload loses nothing, sends anything unsaved with `sendBeacon` when the tab closes, flushes as soon as the connection comes back, and re-checks the session when the back button restores the page.
+- **Phase 10** (Delivery): a `/quizzes` index; per-quiz Delivery settings (one question at a time or all on one page; Standard or Focused page template; hosted or headless, where headless quiz pages redirect to your front end); an embed (`/embed/{slug}` plus `public/embed.js`, which sizes the frame and passes on quiz events) with a copy-and-paste snippet in quiz settings; and Settings → "Embedding and API access" for which sites may embed quizzes and which may call the API from the browser.
 
 See the build order in SPEC.md for what comes next.
 
@@ -112,4 +113,17 @@ Automated checks can't hear what a screen reader says. Before launch, run the qu
    hear the error.
 7. The result page reads the match, its percentage, the runners-up and each category's percentage.
 8. With the screen zoomed to 200%, nothing is cut off and there's no sideways scrolling.
+
+## Embedding a quiz
+
+Copy the snippet from the quiz's settings page (Delivery section) into any web page:
+
+```html
+<iframe src="https://YOUR-SITE/embed/your-quiz" title="Your quiz" style="width:100%;border:0;min-height:480px" loading="lazy"></iframe>
+<script src="https://YOUR-SITE/embed.js" async></script>
+```
+
+- The frame grows and shrinks to fit the quiz. The host page receives `quiz:answer`, `quiz:complete` and `quiz:restart` events on the `<iframe>` element, for analytics.
+- Inside the frame, progress is tied to a key kept in the browser's local storage, because browsers block cookies in third-party frames.
+- Settings → Sites allowed to embed limits which sites may show the frame (empty: any site). Changes take up to a minute to apply. Every other page can only be framed by this site itself.
 

@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
-import { ApiError, quizApi, type Answers, type SessionResponse } from "./api";
+import type { PublicQuestion } from "@/lib/public/structure";
+import { ApiError, embedIdentity, quizApi, type Answers, type SessionResponse } from "./api";
 import { errorMessage, saveErrorMessage } from "./messages";
 import { Progress } from "./progress";
 import { QuestionView } from "./question-view";
 import { ResultView } from "./result-view";
 import { ResumeView } from "./resume-view";
 import { ReviewView } from "./review-view";
+import { SinglePageView } from "./single-page-view";
 import { SaveQueue } from "./save-queue";
 import { answeredCount, currentQuestion, firstProblem, initialState, isSavable, quizReducer } from "./state";
 
@@ -31,8 +33,18 @@ function withQueued(session: SessionResponse, queued: Answers): SessionResponse 
  * time, retried with backoff, mirrored to sessionStorage and flushed with
  * sendBeacon when the page goes away.
  */
-export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode }) {
-  const api = useMemo(() => quizApi(quizId), [quizId]);
+export function QuizClient({
+  quizId,
+  intro,
+  mode = "hosted",
+}: {
+  quizId: number;
+  intro: ReactNode;
+  /** "embed": inside an iframe on another site, where cookies are blocked (identity via localStorage + header). */
+  mode?: "hosted" | "embed";
+}) {
+  const identity = useMemo(() => (mode === "embed" ? embedIdentity() : null), [mode]);
+  const api = useMemo(() => quizApi(quizId, identity), [quizId, identity]);
   const [state, dispatch] = useReducer(quizReducer, initialState);
   const rootRef = useRef<HTMLDivElement>(null);
   const queue = useMemo(
@@ -119,8 +131,13 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
   // Leaving (tab closed, app switched, navigated away): hand the queue to sendBeacon.
   useEffect(() => {
     const url = `/api/v1/quizzes/${quizId}/session/answers`;
+    // Embeds identify by key, not cookie; sendBeacon can't set headers, so it goes in the body.
+    const sessionKeyForBeacon = () => {
+      const key = identity?.get();
+      return key ? { sessionKey: key } : {};
+    };
     const flushOnExit = () => {
-      if (typeof navigator.sendBeacon === "function") queue.beacon(url, (u, data) => navigator.sendBeacon(u, data));
+      if (typeof navigator.sendBeacon === "function") queue.beacon(url, (u, data) => navigator.sendBeacon(u, data), sessionKeyForBeacon());
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flushOnExit();
@@ -131,7 +148,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
       window.removeEventListener("pagehide", flushOnExit);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [queue, quizId]);
+  }, [identity, queue, quizId]);
 
   // Back/forward cache: the page is restored as it was, but the attempt may have moved on.
   useEffect(() => {
@@ -153,13 +170,12 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     return () => window.removeEventListener("pageshow", onPageShow);
   }, [api, queue]);
 
-  const select = (answerIds: number[], how: { fromArrowKey: boolean } = { fromArrowKey: false }) => {
-    const question = currentQuestion(state);
-    if (!question) return;
+  const select = (question: PublicQuestion, index: number, answerIds: number[], how: { fromArrowKey: boolean }) => {
     dispatch({ type: "select", questionId: question.id, answerIds });
     emit("quiz:answer", { questionId: question.id, answerIds });
     if (!isSavable(question, answerIds)) return; // e.g. a multi-select below its minimum
-    queue.set(question.id, answerIds, state.index);
+    queue.set(question.id, answerIds, index);
+    if (state.quiz?.layout === "single_page") return; // auto-advance is for one-at-a-time only
 
     // Optional auto-advance for single-choice questions; Next is always there too.
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
@@ -230,7 +246,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
     <div ref={rootRef} className="flex flex-col gap-6" data-quiz-phase={state.phase}>
       {/* One polite announcement per step; the step itself isn't a live region. */}
       <p aria-live="polite" className="sr-only">
-        {state.phase === "question" && question ? `Question ${state.index + 1} of ${total}` : ""}
+        {state.phase === "question" && question && quiz?.layout !== "single_page" ? `Question ${state.index + 1} of ${total}` : ""}
         {state.phase === "review" ? "Check your answers before seeing your result." : ""}
         {state.phase === "submitting" ? "Working out your result…" : ""}
         {state.phase === "result" ? "Your result is ready." : ""}
@@ -279,7 +295,17 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
               </button>
             </div>
           )}
-          {state.phase === "question" && question ? (
+          {quiz.layout === "single_page" ? (
+            <SinglePageView
+              quiz={quiz}
+              answers={state.answers}
+              busy={state.phase === "submitting"}
+              error={state.error}
+              errorIndex={state.error && state.phase === "question" ? state.index : null}
+              onSelect={select}
+              onSubmit={submit}
+            />
+          ) : state.phase === "question" && question ? (
             <QuestionView
               key={question.id}
               question={question}
@@ -289,7 +315,7 @@ export function QuizClient({ quizId, intro }: { quizId: number; intro: ReactNode
               nextLabel={state.fromReview ? "Back to review" : state.index === total - 1 ? "Review answers" : "Next"}
               busy={false}
               error={state.error}
-              onSelect={select}
+              onSelect={(ids, how) => select(question, state.index, ids, how)}
               onBack={state.index > 0 && !state.fromReview ? () => dispatch({ type: "back" }) : null}
               onNext={() => dispatch({ type: "next" })}
             />

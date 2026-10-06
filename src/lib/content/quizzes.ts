@@ -7,7 +7,7 @@ import type { Database, Executor } from "@/lib/db/create";
 import { categories, quizzes, results } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError, pgError, PG_FOREIGN_KEY_VIOLATION, PG_UNIQUE_VIOLATION } from "./errors";
-import type { QuizInput, QuizRespondentInput, QuizScoringInput } from "./validation";
+import type { QuizDeliveryInput, QuizInput, QuizRespondentInput, QuizScoringInput } from "./validation";
 
 export type QuizSummary = {
   id: number;
@@ -141,6 +141,15 @@ export async function updateQuizScoring(db: Database, id: number, input: QuizSco
 
 /** How respondents move through the quiz: progress bar, auto-advance, retakes. */
 export async function updateQuizRespondentOptions(db: Database, id: number, input: QuizRespondentInput): Promise<void> {
+  await db.transaction(async (tx) => {
+    await lockQuiz(tx, id);
+    await tx.update(quizzes).set(input).where(eq(quizzes.id, id));
+    await bumpStructureVersion(tx, id);
+  });
+}
+
+/** Question layout, page template, and hosted vs headless delivery. */
+export async function updateQuizDelivery(db: Database, id: number, input: QuizDeliveryInput): Promise<void> {
   await db.transaction(async (tx) => {
     await lockQuiz(tx, id);
     await tx.update(quizzes).set(input).where(eq(quizzes.id, id));

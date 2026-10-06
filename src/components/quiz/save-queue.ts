@@ -144,11 +144,12 @@ export class SaveQueue {
    * Entries stay queued (and stored): delivery isn't confirmed, and saving the
    * same answer twice is harmless. Sent at most once until the queue changes.
    */
-  beacon(url: string, sendBeacon: (url: string, data: Blob) => boolean): boolean {
+  beacon(url: string, sendBeacon: (url: string, data: Blob) => boolean, extra: Record<string, unknown> = {}): boolean {
     // Once per change: a second beacon for a first answer would create a second session.
     if (this.entries.size === 0 || this.beaconed) return false;
     // text/plain keeps it a "simple" request: no preflight, same-origin cookies sent.
-    this.beaconed = sendBeacon(url, new Blob([JSON.stringify(this.beaconPayload())], { type: "text/plain" }));
+    const body = JSON.stringify({ ...extra, ...this.beaconPayload() });
+    this.beaconed = sendBeacon(url, new Blob([body], { type: "text/plain" }));
     return this.beaconed;
   }
 

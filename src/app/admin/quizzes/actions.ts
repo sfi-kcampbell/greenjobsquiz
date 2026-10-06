@@ -4,8 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/lib/auth/access";
 import { failure, idSchema, type FormState } from "@/lib/content/action-result";
-import { createQuiz, deleteQuiz, setQuizStatus, updateQuiz, updateQuizRespondentOptions, updateQuizScoring } from "@/lib/content/quizzes";
-import { quizInput, quizRespondentInput, quizScoringInput } from "@/lib/content/validation";
+import {
+  createQuiz,
+  deleteQuiz,
+  setQuizStatus,
+  updateQuiz,
+  updateQuizDelivery,
+  updateQuizRespondentOptions,
+  updateQuizScoring,
+} from "@/lib/content/quizzes";
+import { quizDeliveryInput, quizInput, quizRespondentInput, quizScoringInput } from "@/lib/content/validation";
 import { db } from "@/lib/db/client";
 import { expireQuizPages } from "@/lib/public/page-cache";
 
@@ -102,6 +110,32 @@ export async function updateRespondentOptionsAction(
   }
   revalidatePath("/admin/quizzes", "layout");
   return { ok: true, message: "Respondent options saved." };
+}
+
+export async function updateDeliveryAction(
+  quizId: number,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    await updateQuizDelivery(
+      db,
+      id,
+      quizDeliveryInput.parse({
+        layout: formData.get("layout"),
+        layoutTemplate: formData.get("layoutTemplate"),
+        deliveryMode: formData.get("deliveryMode"),
+        headlessBaseUrl: String(formData.get("headlessBaseUrl") ?? ""),
+      }),
+    );
+  } catch (error) {
+    return failure(error);
+  }
+  expireQuizPages();
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "Delivery settings saved." };
 }
 
 export async function setQuizStatusAction(quizId: number, status: "draft" | "published"): Promise<FormState> {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  accessSettingsInput,
   categoryInput,
+  normalizeOrigin,
+  quizDeliveryInput,
   deriveAbbr,
   uniqueAbbr,
   fieldErrors,
@@ -169,5 +172,54 @@ describe("responseDetailsInput", () => {
     for (const ctaUrl of ["javascript:alert(1)", "plt.org", "ftp://x.org", "data:text/html,x"]) {
       expect(responseDetailsInput.safeParse({ ...base, ctaUrl, ctaLabel: "Go" }).success, ctaUrl).toBe(false);
     }
+  });
+});
+
+describe("quizDeliveryInput", () => {
+  const base = { layout: "stepped", layoutTemplate: "default", deliveryMode: "hosted", headlessBaseUrl: "" };
+
+  it("accepts hosted with no base URL", () => {
+    expect(quizDeliveryInput.parse(base)).toMatchObject({ deliveryMode: "hosted", headlessBaseUrl: null });
+  });
+
+  it("needs an https base URL for headless, without a trailing slash", () => {
+    expect(quizDeliveryInput.safeParse({ ...base, deliveryMode: "headless" }).success).toBe(false);
+    expect(quizDeliveryInput.safeParse({ ...base, deliveryMode: "headless", headlessBaseUrl: "ftp://x.org" }).success).toBe(false);
+    expect(quizDeliveryInput.safeParse({ ...base, deliveryMode: "headless", headlessBaseUrl: "http://example.org" }).success).toBe(false);
+    expect(quizDeliveryInput.parse({ ...base, deliveryMode: "headless", headlessBaseUrl: "https://app.example.org/careers/" }).headlessBaseUrl).toBe(
+      "https://app.example.org/careers",
+    );
+    expect(quizDeliveryInput.parse({ ...base, deliveryMode: "headless", headlessBaseUrl: "http://localhost:5173" }).headlessBaseUrl).toBe(
+      "http://localhost:5173",
+    );
+  });
+
+  it("ignores a bad leftover address when hosted", () => {
+    expect(quizDeliveryInput.parse({ ...base, headlessBaseUrl: "not a url" }).headlessBaseUrl).toBeNull();
+  });
+
+  it("rejects unknown layouts", () => {
+    expect(quizDeliveryInput.safeParse({ ...base, layout: "grid" }).success).toBe(false);
+  });
+});
+
+describe("origins", () => {
+  it("normalizes bare origins and rejects paths", () => {
+    expect(normalizeOrigin(" https://Example.org/ ")).toBe("https://example.org");
+    expect(normalizeOrigin("https://example.org:8443")).toBe("https://example.org:8443");
+    expect(normalizeOrigin("http://localhost:4100")).toBe("http://localhost:4100");
+    expect(normalizeOrigin("https://example.org/page")).toBeNull();
+    expect(normalizeOrigin("http://example.org")).toBeNull();
+    expect(normalizeOrigin("example.org")).toBeNull();
+  });
+
+  it("parses one origin per line, dropping blanks and duplicates, with line-numbered errors", () => {
+    expect(accessSettingsInput.parse({ embedOrigins: "https://a.org\n\nhttps://A.org/\nhttps://b.org", corsOrigins: "" })).toEqual({
+      embedOrigins: ["https://a.org", "https://b.org"],
+      corsOrigins: [],
+    });
+    const bad = accessSettingsInput.safeParse({ embedOrigins: "https://a.org\nhttps://b.org/x", corsOrigins: "" });
+    expect(bad.success).toBe(false);
+    expect(bad.error!.issues[0].message).toMatch(/Line 2/);
   });
 });
