@@ -31,6 +31,8 @@ export type QuizState = {
 export type QuizAction =
   | { type: "loaded"; quiz: PublicQuiz; session: SessionResponse; result: ResultPayload | null }
   | { type: "load_failed"; message: string }
+  /** Back from the back/forward cache: the server's view, with queued picks already on top. */
+  | { type: "refreshed"; session: SessionResponse; result: ResultPayload | null }
   | { type: "reload" }
   | { type: "start" }
   | { type: "resume" }
@@ -127,6 +129,18 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
     }
     case "load_failed":
       return { ...state, phase: "error", error: action.message };
+    case "refreshed": {
+      const { session, result } = action;
+      // Finished in another tab (or before navigating away): show that result.
+      if (session.status === "completed" && result) {
+        return { ...state, phase: "result", result, answers: session.answers, revision: session.revision, error: null, saveError: null };
+      }
+      // Mid-quiz: adopt the server's answers, stay on the same screen.
+      if (state.phase === "question" || state.phase === "review" || state.phase === "resume" || state.phase === "intro") {
+        return { ...state, answers: session.answers, revision: session.revision };
+      }
+      return state;
+    }
     case "reload":
       return { ...initialState };
     case "start":

@@ -148,6 +148,29 @@ describe("submitting", () => {
   });
 });
 
+describe("back/forward cache refresh", () => {
+  it("shows a result finished elsewhere", () => {
+    const s: QuizState = { ...loaded(session()), phase: "question", index: 1 };
+    const next = quizReducer(s, { type: "refreshed", session: session({ status: "completed", revision: 9 }), result });
+    expect(next).toMatchObject({ phase: "result", result, revision: 9 });
+  });
+
+  it("adopts the server's answers mid-quiz without moving", () => {
+    const s: QuizState = { ...loaded(session()), phase: "question", index: 1, answers: { "1": [11] } };
+    const next = quizReducer(s, {
+      type: "refreshed",
+      session: session({ status: "in_progress", revision: 5, answers: { "1": [12], "2": [21] } }),
+      result: null,
+    });
+    expect(next).toMatchObject({ phase: "question", index: 1, revision: 5, answers: { "1": [12], "2": [21] } });
+  });
+
+  it("leaves a shown result alone", () => {
+    const s: QuizState = { ...loaded(session()), phase: "result", result };
+    expect(quizReducer(s, { type: "refreshed", session: session({ status: "in_progress" }), result: null })).toBe(s);
+  });
+});
+
 describe("review", () => {
   it("goes to review after the last question, and Back returns to it", () => {
     let s: QuizState = { ...loaded(session()), phase: "question", index: 2, answers: { "3": [31] } };
