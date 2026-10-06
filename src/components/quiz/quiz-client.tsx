@@ -221,7 +221,7 @@ export function QuizClient({
     }
     try {
       const res = await api.submit();
-      dispatch({ type: "submitted", result: res.result });
+      dispatch({ type: "submitted", result: res.result, shareToken: res.shareToken });
       emit("quiz:complete", { resultId: res.result.match?.resultId ?? null, title: res.result.match?.title ?? null });
     } catch (error) {
       const missing = error instanceof ApiError ? error.details?.questionIds : undefined;
@@ -286,9 +286,13 @@ export function QuizClient({
 
       {(state.phase === "question" || state.phase === "review" || state.phase === "submitting") && quiz && (
         <>
-          {quiz.settings.showProgress && <Progress answered={answeredCount(state)} total={total} />}
+          {quiz.settings.showProgress && (
+            <div className="no-print">
+              <Progress answered={answeredCount(state)} total={total} />
+            </div>
+          )}
           {state.saveError && (
-            <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-danger/40 bg-danger/5 px-4 py-2 text-sm">
+            <div role="status" className="no-print flex flex-wrap items-center gap-3 rounded-md border border-danger/40 bg-danger/5 px-4 py-2 text-sm">
               <span>{state.saveError}</span>
               <button type="button" onClick={() => queue.flushNow().catch(() => {})} className="font-medium text-danger underline underline-offset-4">
                 Retry
@@ -336,6 +340,7 @@ export function QuizClient({
       {state.phase === "result" && state.result && quiz && (
         <ResultView
           result={state.result}
+          shareToken={state.shareToken}
           attempts={state.attempts}
           onRetake={quiz.settings.retakeAllowed ? restart : null}
           restarting={state.restarting}

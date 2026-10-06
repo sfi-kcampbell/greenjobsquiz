@@ -65,9 +65,11 @@ describe("loading", () => {
   });
 
   it("shows the result for a completed attempt", () => {
-    const s = loaded(session({ status: "completed", answeredCount: 3 }), result);
+    const link = { shareToken: "b".repeat(32), resultTitle: "Forester", percent: 90, shareUrl: "", printUrl: "", resultApiUrl: "" };
+    const s = loaded(session({ status: "completed", answeredCount: 3, result: link }), result);
     expect(s.phase).toBe("result");
     expect(s.result).toBe(result);
+    expect(s.shareToken).toBe("b".repeat(32));
   });
 
   it("shows an error for a quiz with no questions", () => {
@@ -126,8 +128,8 @@ describe("submitting", () => {
   it("shows the result once submitted", () => {
     let s = quizReducer({ ...loaded(session()), answers: complete, phase: "review" }, { type: "submit" });
     expect(s.phase).toBe("submitting");
-    s = quizReducer(s, { type: "submitted", result });
-    expect(s).toMatchObject({ phase: "result", result });
+    s = quizReducer(s, { type: "submitted", result, shareToken: "a".repeat(32) });
+    expect(s).toMatchObject({ phase: "result", result, shareToken: "a".repeat(32) });
   });
 
   it("returns to the first missing question the server reports", () => {
@@ -151,8 +153,9 @@ describe("submitting", () => {
 describe("back/forward cache refresh", () => {
   it("shows a result finished elsewhere", () => {
     const s: QuizState = { ...loaded(session()), phase: "question", index: 1 };
-    const next = quizReducer(s, { type: "refreshed", session: session({ status: "completed", revision: 9 }), result });
-    expect(next).toMatchObject({ phase: "result", result, revision: 9 });
+    const link = { shareToken: "c".repeat(32), resultTitle: "Forester", percent: 90, shareUrl: "", printUrl: "", resultApiUrl: "" };
+    const next = quizReducer(s, { type: "refreshed", session: session({ status: "completed", revision: 9, result: link }), result });
+    expect(next).toMatchObject({ phase: "result", result, revision: 9, shareToken: "c".repeat(32) });
   });
 
   it("adopts the server's answers mid-quiz without moving", () => {
@@ -195,7 +198,7 @@ describe("restart", () => {
     s = quizReducer(s, { type: "restart" });
     expect(s.restarting).toBe(true);
     s = quizReducer(s, { type: "restarted", revision: 1 });
-    expect(s).toMatchObject({ phase: "question", index: 0, answers: {}, result: null, revision: 1, restarting: false });
+    expect(s).toMatchObject({ phase: "question", index: 0, answers: {}, result: null, shareToken: null, revision: 1, restarting: false });
   });
 
   it("keeps the current screen and shows why when a restart fails", () => {

@@ -16,6 +16,8 @@ export type QuizState = {
   index: number;
   revision: number;
   result: ResultPayload | null;
+  /** The shown result's share token (for share and print links). */
+  shareToken: string | null;
   /** Earlier submitted attempts (shown with the result). */
   attempts: Attempt[];
   /** A blocking problem (load failed) or a message shown on the question (submit failed). */
@@ -43,7 +45,7 @@ export type QuizAction =
   | { type: "saved"; revision: number; answers?: Answers }
   | { type: "save_failed"; message: string }
   | { type: "submit" }
-  | { type: "submitted"; result: ResultPayload }
+  | { type: "submitted"; result: ResultPayload; shareToken: string }
   | { type: "submit_failed"; message: string; missingQuestionIds?: number[] }
   | { type: "attempts"; attempts: Attempt[] }
   | { type: "restart" }
@@ -57,6 +59,7 @@ export const initialState: QuizState = {
   index: 0,
   revision: 0,
   result: null,
+  shareToken: null,
   attempts: [],
   error: null,
   saveError: null,
@@ -121,7 +124,9 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       const { quiz, session, result } = action;
       const base = { ...initialState, quiz, revision: session.revision, answers: session.answers };
       if (!quiz.questions.length) return { ...base, phase: "error", error: "This quiz has no questions yet." };
-      if (session.status === "completed" && result) return { ...base, phase: "result", result };
+      if (session.status === "completed" && result) {
+        return { ...base, phase: "result", result, shareToken: session.result?.shareToken ?? null };
+      }
       if (session.status === "in_progress" && session.answeredCount > 0) {
         return { ...base, phase: "resume", index: resumeIndex(quiz, session.answers) };
       }
@@ -133,7 +138,16 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       const { session, result } = action;
       // Finished in another tab (or before navigating away): show that result.
       if (session.status === "completed" && result) {
-        return { ...state, phase: "result", result, answers: session.answers, revision: session.revision, error: null, saveError: null };
+        return {
+          ...state,
+          phase: "result",
+          result,
+          shareToken: session.result?.shareToken ?? null,
+          answers: session.answers,
+          revision: session.revision,
+          error: null,
+          saveError: null,
+        };
       }
       // Mid-quiz: adopt the server's answers, stay on the same screen.
       if (state.phase === "question" || state.phase === "review" || state.phase === "resume" || state.phase === "intro") {
@@ -178,7 +192,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       return { ...state, phase: "submitting", error: null };
     }
     case "submitted":
-      return { ...state, phase: "result", result: action.result, error: null };
+      return { ...state, phase: "result", result: action.result, shareToken: action.shareToken, error: null };
     case "submit_failed": {
       const missing = action.missingQuestionIds?.[0];
       const missingIndex = missing === undefined ? -1 : (state.quiz?.questions.findIndex((q) => q.id === missing) ?? -1);
@@ -199,6 +213,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
         answers: {},
         revision: action.revision,
         result: null,
+        shareToken: null,
         error: null,
         saveError: null,
         fromReview: false,
