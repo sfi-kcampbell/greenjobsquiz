@@ -81,6 +81,34 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
         responseOptions={responseOptions}
       />
 
+      <section aria-labelledby="export" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <h2 id="export" className="font-medium">
+          Export CSV
+        </h2>
+        {(() => {
+          // Same filters and order as the table; paging doesn't apply to exports.
+          const exportState = { ...state, per: undefined };
+          const link = "rounded-md border border-border bg-surface px-3 py-1.5 font-medium hover:bg-border/40";
+          return (
+            <>
+              <a href={`/api/admin/submissions/export${listQueryString(exportState, { mode: "long" })}`} className={link} download>
+                Long: one row per answer
+              </a>
+              {query.quiz ? (
+                <a href={`/api/admin/submissions/export${listQueryString(exportState, { mode: "wide" })}`} className={link} download>
+                  Wide: one row per attempt
+                </a>
+              ) : (
+                <span aria-disabled="true" className="rounded-md border border-border px-3 py-1.5 text-muted">
+                  Wide: choose a quiz first
+                </span>
+              )}
+              <span className="text-muted">Uses the filters above{total ? ` (${total} submission${total === 1 ? "" : "s"})` : ""}.</span>
+            </>
+          );
+        })()}
+      </section>
+
       {total === 0 ? (
         <p className="text-muted">{filtered ? "No submissions match these filters." : "No submissions yet. They appear here when someone finishes a quiz."}</p>
       ) : (
