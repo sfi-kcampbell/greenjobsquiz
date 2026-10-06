@@ -9,6 +9,9 @@ import type { Executor } from "@/lib/db/create";
 import { quizzes } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 
+/** Off-site links in what respondents see open in a new tab. */
+const PUBLIC = { external: true } as const;
+
 export type PublicAnswer = { id: number; label: string; bodyHtml: string | null };
 export type PublicQuestion = {
   id: number;
@@ -60,7 +63,7 @@ export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slu
     id: quiz.id,
     slug: quiz.slug,
     title: quiz.title,
-    introHtml: sanitizeRichText(quiz.introHtml),
+    introHtml: sanitizeRichText(quiz.introHtml, PUBLIC),
     layout: quiz.layout,
     settings: {
       allowSkip: quiz.allowSkip,
@@ -74,12 +77,12 @@ export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slu
     questions: questions.map((q) => ({
       id: q.id,
       title: q.title,
-      helpHtml: sanitizeRichText(q.helpHtml),
+      helpHtml: sanitizeRichText(q.helpHtml, PUBLIC),
       type: q.type,
       minSelect: q.minSelect,
       maxSelect: q.maxSelect,
       required: q.required,
-      answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: sanitizeRichText(a.bodyHtml) })),
+      answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: sanitizeRichText(a.bodyHtml, PUBLIC) })),
     })),
   };
 }

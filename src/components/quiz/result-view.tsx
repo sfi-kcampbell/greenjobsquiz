@@ -57,7 +57,7 @@ export function ResultView({
                   href={match.ctaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block rounded-md bg-brand px-5 py-2.5 font-medium text-white hover:bg-brand-strong"
+                  className="inline-block rounded-md border border-transparent bg-brand px-5 py-2.5 font-medium text-white hover:bg-brand-strong"
                 >
                   {match.ctaLabel}
                   <span className="sr-only"> (opens in a new tab)</span>
@@ -103,8 +103,8 @@ export function ResultView({
                   <span className="font-medium">{s.label}</span>
                   <span className="tabular-nums text-muted">{s.percent}%</span>
                 </span>
-                <span aria-hidden className="block h-3 overflow-hidden rounded-full bg-border">
-                  <span className="block h-full rounded-full" style={{ width: `${s.percent}%`, backgroundColor: s.color }} />
+                <span aria-hidden className="meter-track block h-3 overflow-hidden rounded-full bg-border">
+                  <span className="meter-fill block h-full rounded-full" style={{ width: `${s.percent}%`, backgroundColor: s.color }} />
                 </span>
               </li>
             ))}

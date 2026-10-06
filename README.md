@@ -14,6 +14,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 5** (Public API): publishing, and the `/api/v1` API for respondents: quiz structure (never weights), saved progress, restart, server-side scoring on submit, shareable result links, and attempt history.
 - **Phase 6** (Quiz page): the public quiz page at `/quizzes/{slug}` (title, intro, questions one at a time, answers saved as they're picked, and the result with runners-up and a category profile), published quizzes listed on the home page, and an Introduction field in quiz settings. The page HTML is cached and holds no respondent data; editing the title, slug or intro, publishing, unpublishing or deleting a quiz refreshes it immediately. Direct database edits show up within 5 minutes.
 - **Phase 7** (Full quiz flow): multi-select limits (nothing is disabled; going over the maximum shows a message straight away), a "Check your answers" review step with Change links, client-side checks that jump to the first unanswered required question, a "Welcome back — Resume / Start over" prompt, "Take it again" with earlier results listed under the result, and Respondent options in quiz settings (progress bar, auto-advance for single-choice questions, retakes).
+- **Phase 8** (Accessibility): an axe-core audit of every respondent screen and the main admin screens (no violations), a keyboard-only run of the whole quiz, and fixes: auto-advance never fires on arrow keys, a missing answer on submit puts focus on that question's first answer, errors are attached to each input, off-site links in quiz content open in a new tab, bars and buttons stay visible in Windows High Contrast, and reduced motion removes the auto-advance delay. Screen-reader checklist below.
 
 See the build order in SPEC.md for what comes next.
 
@@ -92,3 +93,22 @@ Open http://localhost:3000/admin and sign in with an email from `SUPER_ADMINS`. 
 5. Deploy. The build applies migrations before building, so the database is always current.
 
 Without `AUTH_RESEND_KEY`, production can't send sign-in links and nobody can sign in.
+
+## Screen-reader checklist (manual)
+
+Automated checks can't hear what a screen reader says. Before launch, run the quiz once with
+**NVDA + Firefox or Chrome** (Windows) and once with **VoiceOver + Safari** (Mac or iPhone):
+
+1. On the quiz page, the title and introduction are read, then the **Start** button.
+2. After Start, you hear "Question 1 of N" and the question; Tab reaches the answers and they are
+   read as a radio group (or checkboxes) with the question as the group name.
+3. Arrow keys move between radio answers without jumping to the next question, even with
+   auto-advance on.
+4. Ticking more than the maximum on a multi-select question reads the "You can choose up to…"
+   message straight away.
+5. On the review screen, each **Change** button says which question it changes.
+6. If a required answer is missing when you submit, you land on that question's first answer and
+   hear the error.
+7. The result page reads the match, its percentage, the runners-up and each category's percentage.
+8. With the screen zoomed to 200%, nothing is cut off and there's no sideways scrolling.
+

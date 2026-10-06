@@ -442,7 +442,7 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
     match = {
       resultId: submission.resultId,
       title: c?.title ?? submission.resultTitle ?? "",
-      bodyHtml: sanitizeRichText(c?.bodyHtml),
+      bodyHtml: sanitizeRichText(c?.bodyHtml, { external: true }),
       excerpt: c?.excerpt ?? null,
       ctaUrl: c?.ctaUrl ?? null,
       ctaLabel: c?.ctaLabel ?? null,

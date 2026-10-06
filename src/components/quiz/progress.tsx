@@ -10,9 +10,9 @@ export function Progress({ answered, total }: { answered: number; total: number 
         aria-valuemax={total}
         aria-valuenow={answered}
         aria-valuetext={`${answered} of ${total} answered`}
-        className="h-2 flex-1 overflow-hidden rounded-full bg-border"
+        className="meter-track h-2 flex-1 overflow-hidden rounded-full bg-border"
       >
-        <div className="h-full rounded-full bg-brand motion-safe:transition-[width]" style={{ width: `${percent}%` }} />
+        <div className="meter-fill h-full rounded-full bg-brand motion-safe:transition-[width]" style={{ width: `${percent}%` }} />
       </div>
       <span className="shrink-0 tabular-nums">
         {answered} of {total} answered
