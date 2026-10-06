@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
         source: "/((?!embed/).*)",
         headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self'" }],
       },
+      {
+        // Shared results: the token in the URL is the credential.
+        source: "/quiz-result/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store" },
+        ],
+      },
     ];
   },
 };

@@ -386,7 +386,7 @@ async function storeSubmission(
 /* -------------------------------- Results -------------------------------- */
 
 export type ResultPayload = {
-  quiz: { id: number; title: string; slug: string };
+  quiz: { id: number; title: string; slug: string; deliveryMode: "hosted" | "headless" };
   createdAt: string;
   attemptNo: number;
   status: "scored" | "insufficient_data" | "no_results";
@@ -421,7 +421,7 @@ const shareOfMax = (raw: number, max: number) =>
 /** The token is the credential; unknown or revoked tokens look the same. */
 export async function getResultByShareToken(db: Executor, shareToken: string): Promise<ResultPayload | null> {
   const [row] = await db
-    .select({ submission: submissions, quiz: { id: quizzes.id, title: quizzes.title, slug: quizzes.slug, runnersUpCount: quizzes.runnersUpCount } })
+    .select({ submission: submissions, quiz: { id: quizzes.id, title: quizzes.title, slug: quizzes.slug, deliveryMode: quizzes.deliveryMode, runnersUpCount: quizzes.runnersUpCount } })
     .from(submissions)
     .innerJoin(quizzes, eq(quizzes.id, submissions.quizId))
     .where(eq(submissions.shareTokenHash, hashToken(shareToken)))
@@ -459,7 +459,7 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
       });
 
   return {
-    quiz: { id: quiz.id, title: quiz.title, slug: quiz.slug },
+    quiz: { id: quiz.id, title: quiz.title, slug: quiz.slug, deliveryMode: quiz.deliveryMode },
     createdAt: submission.createdAt.toISOString(),
     attemptNo: submission.attemptNo,
     status: scores.status,

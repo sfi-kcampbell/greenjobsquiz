@@ -91,3 +91,70 @@ body {
     background-color: Highlight !important;
   }
 }
+
+/* Print: the result on paper (or "Save as PDF"). Actions and site chrome are
+   hidden; black on white; bars keep their colours and every bar has its
+   percentage as text; links show their address. */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+  .no-print,
+  nextjs-portal {
+    display: none !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-size: 11pt;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .text-muted,
+  .text-brand {
+    color: #333 !important;
+  }
+  .bg-surface,
+  .bg-brand {
+    background: #fff !important;
+  }
+  .bg-brand {
+    color: #000 !important;
+    border: 1px solid #000 !important;
+  }
+  .border-border {
+    border-color: #999 !important;
+  }
+  section,
+  li,
+  .rounded-lg,
+  .rounded-xl {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+  .meter-track,
+  .meter-fill {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .meter-track {
+    border: 1px solid #999;
+  }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    font-weight: normal;
+    word-break: break-all;
+  }
+}

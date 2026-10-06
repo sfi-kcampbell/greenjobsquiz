@@ -13,7 +13,7 @@ export function PageShell({ template, children }: { template: "default" | "canva
   }
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-border bg-surface">
+      <header className="no-print border-b border-border bg-surface">
         <div className="mx-auto flex w-full max-w-2xl items-center gap-4 px-4 py-3 sm:px-6">
           <Link href="/" className="font-semibold text-brand">
             PLT Quiz
@@ -24,7 +24,7 @@ export function PageShell({ template, children }: { template: "default" | "canva
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
-      <footer className="border-t border-border">
+      <footer className="no-print border-t border-border">
         <div className="mx-auto w-full max-w-2xl px-4 py-4 text-sm text-muted sm:px-6">PLT Green Jobs Quiz</div>
       </footer>
     </div>

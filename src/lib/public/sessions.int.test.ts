@@ -207,7 +207,7 @@ describe.skipIf(!TEST_DATABASE_URL)("public: structure and sessions (Postgres)",
 
     const payload = await getResultByShareToken(db, done.shareToken);
     expect(payload).toMatchObject({
-      quiz: { id: quizId, slug: "green-jobs" },
+      quiz: { id: quizId, slug: "green-jobs", deliveryMode: "hosted" },
       status: "scored",
       match: { resultId: forester, title: "Forester", bodyHtml: "<p><strong>Forests</strong></p>", ctaUrl: "https://example.org", percent: 100 },
       runnersUp: [{ resultId: analyst, title: "Analyst", percent: 0 }],
