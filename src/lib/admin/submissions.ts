@@ -70,6 +70,13 @@ const SORT_COLUMNS = {
   time: submissions.durationSeconds,
 } satisfies Record<SortKey, unknown>;
 
+/** ORDER BY for a list query: blanks last either way; id breaks ties so pages never shuffle. Needs `quizzes` joined. */
+export function orderFor(query: SubmissionListQuery): SQL[] {
+  const column = SORT_COLUMNS[query.sort];
+  const direction = query.dir === "asc" ? sql`asc` : sql`desc`;
+  return [sql`${column} ${direction} nulls last`, query.dir === "asc" ? asc(submissions.id) : desc(submissions.id)];
+}
+
 /* --------------------------------- List ---------------------------------- */
 
 export type SubmissionRow = {
@@ -88,7 +95,8 @@ export type SubmissionRow = {
   suspect: boolean;
 };
 
-async function filters(db: Executor, query: SubmissionListQuery): Promise<SQL | undefined> {
+/** The WHERE clause for a list query (shared with the CSV export). */
+export async function filters(db: Executor, query: SubmissionListQuery): Promise<SQL | undefined> {
   const conditions: (SQL | undefined)[] = [];
   if (query.quiz) {
     conditions.push(eq(submissions.quizId, query.quiz));
@@ -128,8 +136,6 @@ export async function listSubmissions(db: Executor, query: SubmissionListQuery) 
     .groupBy(questions.quizId)
     .as("question_totals");
 
-  const column = SORT_COLUMNS[query.sort];
-  const direction = query.dir === "asc" ? sql`asc` : sql`desc`;
   const rows = await db
     .select({
       id: submissions.id,
@@ -150,8 +156,7 @@ export async function listSubmissions(db: Executor, query: SubmissionListQuery) 
     .innerJoin(quizzes, eq(quizzes.id, submissions.quizId))
     .leftJoin(questionTotals, eq(questionTotals.quizId, submissions.quizId))
     .where(where)
-    // Blanks last either way; id breaks ties so pages never shuffle.
-    .orderBy(sql`${column} ${direction} nulls last`, query.dir === "asc" ? asc(submissions.id) : desc(submissions.id))
+    .orderBy(...orderFor(query))
     .limit(query.per)
     .offset((page - 1) * query.per);
 
