@@ -35,7 +35,7 @@ export function SettingsForm({
         <p id="quiz-intro-hint" className="text-sm text-muted">
           Shown on the quiz page above the Start button.
         </p>
-        <RichTextEditor id="quiz-intro" label="Introduction" value={intro} onChange={setIntro} />
+        <RichTextEditor id="quiz-intro" label="Introduction" value={intro} onChange={setIntro} quizId={quizId} />
         <input type="hidden" name="introHtml" value={intro} />
         {state.fieldErrors?.introHtml && <p className="text-sm text-danger">{state.fieldErrors.introHtml}</p>}
       </div>

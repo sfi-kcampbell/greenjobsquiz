@@ -5,15 +5,32 @@ import sanitizeHtml from "sanitize-html";
  * response bodies). Runs when content is saved and again whenever it is
  * served, so older or hand-edited rows are still cleaned on the way out.
  */
+/** Only images uploaded to this app: /media/{uuid}. No hot-linking, tracking pixels or mixed content. */
+const MEDIA_SRC = /^\/media\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const dimension = (v: string | undefined) => (v && /^\d{1,5}$/.test(v) && Number(v) > 0 ? v : undefined);
+
 const OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "blockquote", "h3", "h4", "code"],
-  allowedAttributes: { a: ["href", "target", "rel"] },
+  allowedTags: ["p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li", "blockquote", "h3", "h4", "code", "img"],
+  allowedAttributes: { a: ["href", "target", "rel"], img: ["src", "alt", "width", "height"] },
   allowedSchemes: ["http", "https", "mailto"],
   allowProtocolRelative: false,
+  // Images from anywhere else are dropped entirely.
+  exclusiveFilter: (frame) => frame.tag === "img" && !MEDIA_SRC.test(frame.attribs.src ?? ""),
   transformTags: {
     // Tiptap emits <b>/<i> from pasted content in some browsers.
     b: "strong",
     i: "em",
+    img: (tagName, attribs) => ({
+      tagName,
+      attribs: Object.fromEntries(
+        Object.entries({
+          src: attribs.src,
+          alt: attribs.alt ?? "", // decorative unless described
+          width: dimension(attribs.width),
+          height: dimension(attribs.height),
+        }).filter(([, v]) => v !== undefined),
+      ) as Record<string, string>,
+    }),
     a: (tagName, attribs) => ({
       tagName,
       attribs: {
@@ -51,5 +68,5 @@ export function sanitizeRichText(html: string | null | undefined, opts: { extern
   if (!html) return null;
   const clean = sanitizeHtml(html, opts.external ? EXTERNAL_OPTIONS : OPTIONS).trim();
   const text = sanitizeHtml(clean, { allowedTags: [], allowedAttributes: {} }).replace(/&nbsp;/g, " ").trim();
-  return text ? clean : null;
+  return text || clean.includes("<img") ? clean : null; // an image on its own is content
 }

@@ -1,23 +1,30 @@
 "use client";
 
+import Image from "@tiptap/extension-image";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { useRef, useState } from "react";
+import { ACCEPTED_IMAGE_TYPES, uploadImage } from "./upload-image";
 
 /**
- * Small rich-text editor for answer, question-help and response bodies.
- * Only formatting the sanitizer allows is offered (see lib/sanitize).
- * Mount it only when visible; collapsed drawers render nothing.
+ * Small rich-text editor for the intro, question help, answer and response
+ * bodies. Only formatting the sanitizer allows is offered (see lib/sanitize),
+ * including images uploaded to this app. Mount it only when visible;
+ * collapsed drawers render nothing.
  */
 export function RichTextEditor({
   id,
   label,
   value,
   onChange,
+  quizId,
 }: {
   id: string;
   label: string;
   value: string | null;
   onChange: (html: string) => void;
+  /** Tags uploaded images with their quiz (optional). */
+  quizId?: number;
 }) {
   const editor = useEditor({
     // Rendered only on the client; avoids a server/client mismatch.
@@ -29,6 +36,8 @@ export function RichTextEditor({
         horizontalRule: false,
         link: { openOnClick: false, autolink: true, defaultProtocol: "https" },
       }),
+      // Pasted images from other sites are removed on save (only /media/... is kept).
+      Image.configure({ inline: false, allowBase64: false }),
     ],
     content: value ?? "",
     editorProps: {
@@ -45,13 +54,35 @@ export function RichTextEditor({
 
   return (
     <div className="rounded-md border border-border bg-surface focus-within:border-brand">
-      {editor && <Toolbar editor={editor} label={label} />}
+      {editor && <Toolbar editor={editor} label={label} quizId={quizId} />}
       <EditorContent editor={editor} />
     </div>
   );
 }
 
-function Toolbar({ editor, label }: { editor: Editor; label: string }) {
+function Toolbar({ editor, label, quizId }: { editor: Editor; label: string; quizId?: number }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imageStatus, setImageStatus] = useState<{ text: string; error: boolean } | null>(null);
+
+  async function addImage(file: File) {
+    setImageStatus({ text: "Uploading image…", error: false });
+    try {
+      const image = await uploadImage(file, quizId);
+      const alt = window.prompt(
+        "Describe the image for people who can't see it.\nLeave empty if it's decorative.",
+        "",
+      );
+      if (alt === null) {
+        setImageStatus(null); // cancelled
+        return;
+      }
+      editor.chain().focus().setImage({ src: image.url, alt: alt.trim(), width: image.width, height: image.height }).run();
+      setImageStatus({ text: "Image added.", error: false });
+    } catch (error) {
+      setImageStatus({ text: error instanceof Error ? error.message : "The image couldn't be added.", error: true });
+    }
+  }
+
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -96,6 +127,25 @@ function Toolbar({ editor, label }: { editor: Editor; label: string }) {
       {button("Numbered list", "Numbered", state.orderedList, () => editor.chain().focus().toggleOrderedList().run())}
       {button("Link", "Link", state.link, editLink)}
       {button("Clear formatting", "Clear", false, () => editor.chain().focus().unsetAllMarks().clearNodes().run())}
+      {button("Image", "Image", false, () => fileRef.current?.click())}
+      <input
+        ref={fileRef}
+        type="file"
+        accept={ACCEPTED_IMAGE_TYPES}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ""; // allow choosing the same file again
+          if (file) void addImage(file);
+        }}
+      />
+      {imageStatus && (
+        <span role="status" className={`self-center px-1 text-xs ${imageStatus.error ? "text-danger" : "text-muted"}`}>
+          {imageStatus.text}
+        </span>
+      )}
     </div>
   );
 }

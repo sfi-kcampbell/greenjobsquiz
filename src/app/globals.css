@@ -158,3 +158,13 @@ body {
     word-break: break-all;
   }
 }
+
+/* Images in authored rich text (editor and pages): never wider than their column. */
+.rich-text img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+}
+.rich-text img.ProseMirror-selectednode {
+  outline: 2px solid var(--brand);
+}

@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ConfigWarning } from "@/components/config-warning";
+import { CssForm } from "@/components/css-form";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
 import { requestOrigin } from "@/lib/app-url";
+import { getMediaMeta, mediaUrl } from "@/lib/media/media";
 import { healthReport } from "@/lib/scoring/health";
+import { updateQuizCssAction } from "../actions";
+import { BannerForm } from "./banner-form";
 import { loadBundle, loadQuiz } from "./load";
 import { DeliveryForm, EmbedSnippet } from "./delivery-form";
 import { PublishControl } from "./publish-control";
@@ -25,6 +29,10 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
   // Relative, so previews link to themselves rather than to APP_URL.
   const apiUrl = `/api/v1/quizzes/${quiz.id}`;
   const pageUrl = `/quizzes/${quiz.slug}`;
+  const bannerMeta = quiz.bannerMediaId ? await getMediaMeta(db, quiz.bannerMediaId) : null;
+  const banner = bannerMeta
+    ? { mediaId: bannerMeta.id, url: mediaUrl(bannerMeta.id), alt: quiz.bannerAlt ?? "", width: bannerMeta.width, height: bannerMeta.height }
+    : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -76,6 +84,28 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         {quiz.status === "published" && quiz.deliveryMode === "hosted" && (
           <EmbedSnippet origin={await requestOrigin()} slug={quiz.slug} title={quiz.title} />
         )}
+      </section>
+
+      <section aria-labelledby="banner" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="banner" className="font-semibold">
+          Banner
+        </h2>
+        <BannerForm quizId={quiz.id} banner={banner} />
+      </section>
+
+      <section aria-labelledby="quiz-css" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="quiz-css" className="font-semibold">
+          Quiz CSS (overrides the site-wide CSS)
+        </h2>
+        <CssForm
+          id="quiz-css-input"
+          label="Quiz CSS"
+          action={updateQuizCssAction.bind(null, quiz.id)}
+          css={quiz.customCss}
+          hint="Styles for this quiz only, on its page, embed and shared results. They come after the site-wide CSS, so a rule here wins over the same rule there (unless that one uses !important). Admin pages are never affected."
+          previewUrl={quiz.status === "published" ? pageUrl : null}
+          submitLabel="Save quiz CSS"
+        />
       </section>
 
       <section aria-labelledby="respondents" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">

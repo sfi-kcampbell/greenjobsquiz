@@ -79,7 +79,7 @@ export function QuestionView({
             type="button"
             onClick={onBack}
             disabled={busy}
-            className="rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
+            className="pltq-button rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
           >
             Back
           </button>
@@ -87,7 +87,7 @@ export function QuestionView({
         <button
           type="submit"
           disabled={busy}
-          className="ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          className="pltq-button pltq-button--primary ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
           {nextLabel}
         </button>

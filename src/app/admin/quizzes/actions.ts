@@ -9,11 +9,21 @@ import {
   deleteQuiz,
   setQuizStatus,
   updateQuiz,
+  updateQuizBanner,
+  updateQuizCss,
   updateQuizDelivery,
   updateQuizRespondentOptions,
   updateQuizScoring,
 } from "@/lib/content/quizzes";
-import { quizDeliveryInput, quizInput, quizRespondentInput, quizScoringInput } from "@/lib/content/validation";
+import {
+  customCssInput,
+  quizBannerInput,
+  quizDeliveryInput,
+  quizInput,
+  quizRespondentInput,
+  quizScoringInput,
+} from "@/lib/content/validation";
+import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { expireQuizPages } from "@/lib/public/page-cache";
 
@@ -150,4 +160,39 @@ export async function setQuizStatusAction(quizId: number, status: "draft" | "pub
   expireQuizPages();
   revalidatePath("/admin/quizzes", "layout");
   return { ok: true, message: status === "published" ? "Published." : "Unpublished." };
+}
+
+export async function updateBannerAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
+  await requireStaff();
+  const id = idSchema.parse(quizId);
+  const removing = formData.get("intent") === "remove";
+  try {
+    await updateQuizBanner(
+      db,
+      id,
+      quizBannerInput.parse({
+        mediaId: removing ? "" : String(formData.get("mediaId") ?? ""),
+        alt: formData.get("decorative") ? "" : String(formData.get("alt") ?? ""),
+      }),
+    );
+  } catch (error) {
+    return failure(error);
+  }
+  expireQuizPages();
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: removing ? "Banner removed." : "Banner saved." };
+}
+
+export async function updateQuizCssAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
+  await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    const { css } = z.object({ css: customCssInput }).parse({ css: String(formData.get("css") ?? "") });
+    await updateQuizCss(db, id, css);
+  } catch (error) {
+    return failure(error);
+  }
+  expireQuizPages();
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "Quiz CSS saved." };
 }

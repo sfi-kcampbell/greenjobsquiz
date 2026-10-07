@@ -96,6 +96,7 @@ This is a greenfield project in this repo.
 | `results` (Responses) | id, quiz_id (cascade), title, body_html, excerpt, image_url, cta_url, cta_label, position |
 | `answer_weights` | (answer_id, category_id) PK, weight numeric(4,2). Both foreign keys cascade |
 | `result_weights` | (result_id, category_id) PK, weight numeric(4,2). Both foreign keys cascade |
+| `media` | id (uuid), quiz_id (set null), content_type (png/jpeg/webp/gif), bytes (bytea, ≤ 2 MB), byte_size, width, height, filename, sha256 (unique: stored once), created_by, created_at |
 | `staff_users` | id, email (unique, lowercased), name, role (`admin`), invited_by, disabled_at, created_at |
 | Auth.js tables | users, accounts, sessions, verification_tokens (the standard Drizzle adapter) |
 
@@ -127,6 +128,8 @@ the scale from −5 (strongly against) to +5 (strongly for).
 | layout_template | `default` \| `canvas` |
 | default_result_id | fallback result when the respondent's vector is all zero |
 | result_headline | text |
+| banner_media_id, banner_alt | the banner image (→ media, set null) and its alt text (empty: decorative) |
+| custom_css | the quiz's CSS (≤ 50,000 characters); `settings.custom_css` holds the site-wide CSS |
 | structure_version | increments on every content save; used for the cache key and ETag |
 
 **Publishing:** only `published` quizzes are served publicly. Drafts return 404 to the public.
@@ -660,6 +663,22 @@ allowed origins in Settings, and the default allows all.
   IDs never appear in public URLs.
 - **PDF:** no server-side PDF library. The browser's "Save as PDF" on the print route is the PDF
   feature. A v1.1 idea is "Email me my results" through Resend.
+
+### Images, banner and custom CSS
+
+- **Uploads:** `POST /api/admin/media` (staff, multipart `file`). The type comes from magic bytes
+  (PNG, JPEG, WebP, GIF; never SVG), 2 MB maximum, deduplicated by sha256.
+- **Serving:** `GET /media/{id}` with `Cache-Control: public, max-age=31536000, immutable`,
+  `nosniff`, `Content-Disposition: inline` and a `default-src 'none'; sandbox` CSP.
+- **Rich text:** the sanitizer keeps `<img>` only with `src="/media/{uuid}"`, `alt`, `width` and
+  `height`. API responses rewrite `/media/…` to the request's own origin.
+- **Banner:** shown above the title on the hosted page, the embed and `/quiz-result/{token}`;
+  `quiz.banner` in the API.
+- **Custom CSS:** site-wide (`<style id="pltq-site-css">`) then the quiz's
+  (`<style id="pltq-quiz-css">`), on respondent pages only. Validation refuses `<`, `@import`,
+  `expression()`, `javascript:`, `behavior`, `-moz-binding`, and addresses on other sites in
+  `url()` or strings (checked after resolving CSS escapes). The stable `pltq-*` hooks are listed
+  in `src/lib/content/css-hooks.ts` and the README.
 
 ---
 

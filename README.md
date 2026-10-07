@@ -8,7 +8,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 
 - **Phase 0** (skeleton): database schema and migrations, staff sign-in, Super Admin / Admin roles, the admin shell and the Staff screen.
 - **Phase 1** (Categories): the quiz list, quiz settings, the builder shell, and the Categories tab (add, edit, reorder, delete, suggested set).
-- **Phase 2** (Questions): question cards with an answers × categories weight matrix (keyboard entry, row and column totals), rich-text answer details and help text, and drag-to-reorder for questions and answers. Images for questions and answers come later, with media storage.
+- **Phase 2** (Questions): question cards with an answers × categories weight matrix (keyboard entry, row and column totals), rich-text answer details and help text, and drag-to-reorder for questions and answers.
 - **Phase 3** (Responses): a responses × categories weight grid with live near-duplicate and no-weights warnings and "Normalize to 10", plus an editor per response (summary, rich description, call to action, and a Category Profile with live bars).
 - **Phase 4** (Scoring): the scoring engine (`src/lib/scoring/engine.ts`, pure and fully unit-tested), the Simulate tab (answer as a respondent, see the ranked responses and category profile, and search for answers that produce a given response), the Health tab with its warning count on the tab, and scoring settings (runners-up, category balancing, fallback response) on the quiz settings page.
 - **Phase 5** (Public API): publishing, and the `/api/v1` API for respondents: quiz structure (never weights), saved progress, restart, server-side scoring on submit, shareable result links, and attempt history.
@@ -20,6 +20,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 11** (Print and share): the result screen has **Print**, **Copy link** (or **Share** on phones) and **Printable page**. Share links open `/quiz-result/{token}`, a standalone page that anyone with the link can see (never cached or indexed, and it sends no referrer). `?autoprint=1` opens the print dialog. A print stylesheet hides buttons and site chrome, prints black on white, keeps bar colours and percentages, and shows link addresses; the browser's "Save as PDF" makes the PDF. Clearing a submission's `share_token_hash` revokes its link (or use **Turn off share link** on the submission's page).
 - **Phase 12** (Submissions, Super Admin only): a list of every finished attempt with filters (quiz, matched response, date range in UTC, search over email and response), sortable columns, paging, and single or bulk delete, with all of it kept in the URL; and a detail page with the respondent and timing, the ranking with each runner-up's gap to first place, the category profile (raw, normalized, max), and the answers with the weights and contributions stored at submit time. Deleting a submission lets that respondent start the quiz fresh.
 - **Phase 13** (CSV export): from Submissions, **Long** (one row per answered question) or **Wide** (one row per attempt with raw and normalized scores per category; needs a quiz filter), using the list's filters and order. Files stream in batches of 500 with a UTF-8 BOM. Any text cell starting with `=`, `+`, `-`, `@`, tab or carriage return gets a leading `'`, so spreadsheets show it as text instead of running it as a formula; numbers stay numbers.
+- **Images, banner and custom CSS**: an **Image** button in every rich-text editor (intro, question help, answer details, response descriptions), a **Banner** per quiz, and custom CSS site-wide (Settings, Super Admin) and per quiz (quiz settings), with the quiz's CSS overriding the site's. See "Images and custom CSS" below.
 
 See the build order in SPEC.md for what comes next.
 
@@ -130,3 +131,44 @@ Copy the snippet from the quiz's settings page (Delivery section) into any web p
 - Inside the frame, progress is tied to a key kept in the browser's local storage, because browsers block cookies in third-party frames.
 - Settings → Sites allowed to embed limits which sites may show the frame (empty: any site). Changes take up to a minute to apply. Every other page can only be framed by this site itself.
 
+
+## Images and custom CSS
+
+**Images** (rich-text editors and the quiz banner):
+- PNG, JPEG, WebP or GIF, up to 2 MB. The type is checked from the file's contents. SVG is refused, because it can carry scripts.
+- Images are stored in Postgres (`media` table); the same file uploaded twice is stored once. They're served from `/media/{id}` with year-long `immutable` caching, so the database is read about once per image per CDN location.
+- Alt text is asked for on insert; leave it empty for a decorative image.
+- Rich text may only show this site's own `/media/…` images; anything else is removed when saved. The `/api/v1` responses give full image addresses (`https://…/media/…`) for headless front ends.
+- Images that are no longer used aren't cleaned up yet (planned with Phase 14's retention work).
+
+**Banner:** quiz settings → Banner. It's shown above the title on the quiz page, the embed and the shared result page, and is in the API as `quiz.banner` (`{ url, alt, width, height }` or `null`).
+
+**Custom CSS:** Settings → "Site-wide CSS" (Super Admin) and quiz settings → "Quiz CSS". It applies to the quiz page, the embed and the shared result page, never to admin pages. The site-wide CSS comes first and the quiz's after it, so with equal specificity the quiz's rule wins (unless the site's uses `!important`). For safety, CSS can't contain `<`, `@import`, or `url()` addresses on other sites (`/media/…` and `data:` are fine). "Add element" inserts a ready-made rule for any of these stable classes (other class names are internal and may change):
+
+| Element | Selector |
+|---|---|
+| Whole quiz | `.pltq-quiz` |
+| Banner | `.pltq-banner` |
+| Quiz title | `.pltq-title` |
+| Introduction | `.pltq-intro` |
+| Progress bar | `.pltq-progress` |
+| Question | `.pltq-question` |
+| Question title | `.pltq-question-title` |
+| Question help | `.pltq-question-help` |
+| Answer | `.pltq-answer` |
+| Selected answer | `.pltq-answer[data-selected]` |
+| Answer details | `.pltq-answer-details` |
+| Error message | `.pltq-error` |
+| Buttons | `.pltq-button` |
+| Primary button | `.pltq-button--primary` |
+| Review screen | `.pltq-review` |
+| Result | `.pltq-result` |
+| Response (best match) | `.pltq-response` |
+| Response title | `.pltq-response-title` |
+| Call-to-action button | `.pltq-cta` |
+| Runners-up | `.pltq-runners-up` |
+| Category profile | `.pltq-profile` |
+| Category bar | `.pltq-bar` |
+| Site header / footer | `.pltq-site-header`, `.pltq-site-footer` |
+
+The list lives in `src/lib/content/css-hooks.ts`.

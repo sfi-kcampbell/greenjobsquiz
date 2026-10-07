@@ -54,18 +54,18 @@ export function QuestionFieldset({
         }}
         aria-describedby={[question.helpHtml ? helpId : null, message ? messageId : null].filter(Boolean).join(" ") || undefined}
         aria-invalid={message ? true : undefined}
-        className="flex flex-col gap-4"
+        className="pltq-question flex flex-col gap-4"
       >
         <legend className="mb-4 w-full">
           <span className="block text-sm font-medium text-muted">
             Question {number} of {total}
             {!question.required && " (optional)"}
           </span>
-          <h2 ref={headingRef} tabIndex={-1} className="mt-1 text-xl focus:outline-none font-semibold sm:text-2xl">
+          <h2 ref={headingRef} tabIndex={-1} className="pltq-question-title mt-1 text-xl focus:outline-none font-semibold sm:text-2xl">
             {question.title}
           </h2>
         </legend>
-        <RichHtml id={helpId} html={question.helpHtml} className="-mt-2 text-muted" />
+        <RichHtml id={helpId} html={question.helpHtml} className="pltq-question-help -mt-2 text-muted" />
         {multi && (
           <p className="text-sm text-muted">
             {question.minSelect === question.maxSelect
@@ -82,7 +82,8 @@ export function QuestionFieldset({
             return (
               <div
                 key={answer.id}
-                className={`rounded-lg border-2 bg-surface px-4 py-3 ${checked ? "border-brand" : "border-border"} has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand`}
+                data-selected={checked ? "" : undefined}
+                className={`pltq-answer rounded-lg border-2 bg-surface px-4 py-3 ${checked ? "border-brand" : "border-border"} has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand`}
               >
                 <label htmlFor={inputId} className="flex cursor-pointer items-start gap-3">
                   <input
@@ -99,7 +100,7 @@ export function QuestionFieldset({
                   />
                   <span className={`text-lg ${checked ? "font-semibold" : ""}`}>{answer.label}</span>
                 </label>
-                <RichHtml id={detailsId} html={answer.bodyHtml} className="mt-1 pl-8 text-sm text-muted" />
+                <RichHtml id={detailsId} html={answer.bodyHtml} className="pltq-answer-details mt-1 pl-8 text-sm text-muted" />
               </div>
             );
           })}
@@ -107,7 +108,7 @@ export function QuestionFieldset({
       </fieldset>
 
       {message && (
-        <p id={messageId} role="alert" className="font-medium text-danger">
+        <p id={messageId} role="alert" className="pltq-error font-medium text-danger">
           {message}
         </p>
       )}

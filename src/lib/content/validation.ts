@@ -332,3 +332,76 @@ export const accessSettingsInput = z.object({
   corsOrigins: originList,
 });
 export type AccessSettingsInput = z.infer<typeof accessSettingsInput>;
+
+/* --------------------------------- Banner -------------------------------- */
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export const quizBannerInput = z.object({
+  /** null removes the banner. */
+  mediaId: z
+    .string()
+    .trim()
+    .transform((v) => v || null)
+    .refine((v) => v === null || UUID.test(v), "Upload the banner image again."),
+  /** Empty means decorative. */
+  alt: z.string().trim().max(300, "Keep the description under 300 characters."),
+});
+export type QuizBannerInput = z.infer<typeof quizBannerInput>;
+
+/* ------------------------------- Custom CSS ------------------------------ */
+
+export const CSS_MAX = 50_000;
+
+/**
+ * Why a stylesheet can't be used, or null. The CSS goes inside a <style>
+ * element on public pages, so "<" is refused (no way to close the element and
+ * inject HTML); it may not load anything from other sites (@import, outside
+ * url()), so it can't pull in code or leak visitors' addresses.
+ */
+export function cssProblem(raw: string): string | null {
+  const lt = raw.indexOf("<");
+  if (lt >= 0) return `Line ${lineOf(raw, lt)}: CSS can't contain "<".`;
+  // Check the CSS as the browser reads it, so escapes (u\72l, @\69mport) can't hide anything.
+  const css = unescapeCss(raw);
+  const importAt = css.search(/@import\b/i);
+  if (importAt >= 0) return `Line ${lineOf(css, importAt)}: @import isn't allowed. Put the rules here instead.`;
+  for (const m of css.matchAll(/(expression\s*\(|javascript\s*:|behavior\s*:|-moz-binding)/gi)) {
+    return `Line ${lineOf(css, m.index ?? 0)}: "${m[1]}" isn't allowed.`;
+  }
+  for (const m of css.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/gi)) {
+    if (!localOrData(m[2])) {
+      return `Line ${lineOf(css, m.index ?? 0)}: url(${m[2].trim()}) points outside this site. Use an uploaded image (/media/…) or a data: URL.`;
+    }
+  }
+  // image-set("…") and friends take plain strings as addresses too.
+  for (const m of css.matchAll(/(['"])\s*((?:[a-z][a-z0-9+.-]*:)?\/\/[^'"]*)\1/gi)) {
+    if (!localOrData(m[2])) {
+      return `Line ${lineOf(css, m.index ?? 0)}: "${m[2].trim()}" looks like an address outside this site, which isn't allowed.`;
+    }
+  }
+  return null;
+}
+
+const lineOf = (text: string, index: number) => text.slice(0, index).split("\n").length;
+
+const localOrData = (target: string) => {
+  const t = target.trim();
+  return (t.startsWith("/") && !t.startsWith("//")) || /^data:/i.test(t) || !/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(t);
+};
+
+/** Resolves CSS escapes (\75 or \u) to the characters they stand for. */
+function unescapeCss(css: string): string {
+  return css.replace(/\\(?:([0-9a-f]{1,6})[ \t\n]?|([^\n0-9a-f]))/gi, (_, hex: string | undefined, ch: string | undefined) =>
+    hex ? String.fromCodePoint(Math.min(parseInt(hex, 16), 0x10ffff) || 0xfffd) : (ch ?? ""),
+  );
+}
+
+export const customCssInput = z
+  .string()
+  .max(CSS_MAX, `Keep the CSS under ${CSS_MAX.toLocaleString("en")} characters.`)
+  .transform((css) => css.replace(/\r\n/g, "\n"))
+  .superRefine((css, ctx) => {
+    const problem = cssProblem(css);
+    if (problem) ctx.addIssue({ code: "custom", message: problem });
+  });
