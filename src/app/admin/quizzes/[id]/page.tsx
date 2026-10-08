@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ConfigWarning } from "@/components/config-warning";
+import { AuditList } from "@/components/audit-list";
 import { CssForm } from "@/components/css-form";
+import { listAudit } from "@/lib/audit";
+import { requireStaff } from "@/lib/auth/access";
 import { StatusBadge } from "@/components/status-badge";
 import { listResponses } from "@/lib/content/responses";
 import { db } from "@/lib/db/client";
@@ -9,6 +12,7 @@ import { requestOrigin } from "@/lib/app-url";
 import { getMediaMeta, mediaUrl } from "@/lib/media/media";
 import { healthReport } from "@/lib/scoring/health";
 import { updateQuizCssAction } from "../actions";
+import { DuplicateQuizButton } from "../quiz-file-controls";
 import { BannerForm } from "./banner-form";
 import { loadBundle, loadQuiz } from "./load";
 import { DeliveryForm, EmbedSnippet } from "./delivery-form";
@@ -29,6 +33,8 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
   // Relative, so previews link to themselves rather than to APP_URL.
   const apiUrl = `/api/v1/quizzes/${quiz.id}`;
   const pageUrl = `/quizzes/${quiz.slug}`;
+  const staff = await requireStaff();
+  const recent = await listAudit(db, { superAdmin: staff.role === "super_admin", quizId: quiz.id, pageSize: 8 });
   const bannerMeta = quiz.bannerMediaId ? await getMediaMeta(db, quiz.bannerMediaId) : null;
   const banner = bannerMeta
     ? { mediaId: bannerMeta.id, url: mediaUrl(bannerMeta.id), alt: quiz.bannerAlt ?? "", width: bannerMeta.width, height: bannerMeta.height }
@@ -129,6 +135,38 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
           defaultResultId={quiz.defaultResultId}
           responses={responses.map(({ id, title }) => ({ id, title }))}
         />
+      </section>
+
+      <section aria-labelledby="copy" className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+        <h2 id="copy" className="font-semibold">
+          Copy and export
+        </h2>
+        <p className="text-sm text-muted">
+          Duplicate makes a draft copy here (no submissions). Export downloads the whole quiz, images included, as a{" "}
+          <code>.quiz.json</code> file you can import on the Quizzes page, here or on another site.
+        </p>
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <DuplicateQuizButton
+            quizId={quiz.id}
+            title={quiz.title}
+            className="rounded-md border border-border px-4 py-2 font-medium hover:bg-border/40 disabled:opacity-60"
+          />
+          <a href={`/api/admin/quizzes/${quiz.id}/export`} download className="rounded-md border border-border px-4 py-2 font-medium hover:bg-border/40">
+            Export quiz file
+          </a>
+        </div>
+      </section>
+
+      <section aria-labelledby="recent" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="recent" className="font-semibold">
+            Recent changes
+          </h2>
+          <Link href={`/admin/activity?quiz=${quiz.id}`} className="text-sm text-brand underline underline-offset-4">
+            All activity for this quiz
+          </Link>
+        </div>
+        <AuditList rows={recent.rows} showQuiz={false} />
       </section>
 
       <section aria-labelledby="danger" className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-surface p-4">

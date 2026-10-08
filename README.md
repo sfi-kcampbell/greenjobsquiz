@@ -21,6 +21,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Phase 12** (Submissions, Super Admin only): a list of every finished attempt with filters (quiz, matched response, date range in UTC, search over email and response), sortable columns, paging, and single or bulk delete, with all of it kept in the URL; and a detail page with the respondent and timing, the ranking with each runner-up's gap to first place, the category profile (raw, normalized, max), and the answers with the weights and contributions stored at submit time. Deleting a submission lets that respondent start the quiz fresh.
 - **Phase 13** (CSV export): from Submissions, **Long** (one row per answered question) or **Wide** (one row per attempt with raw and normalized scores per category; needs a quiz filter), using the list's filters and order. Files stream in batches of 500 with a UTF-8 BOM. Any text cell starting with `=`, `+`, `-`, `@`, tab or carriage return gets a leading `'`, so spreadsheets show it as text instead of running it as a formula; numbers stay numbers.
 - **Images, banner and custom CSS**: an **Image** button in every rich-text editor (intro, question help, answer details, response descriptions), a **Banner** per quiz, and custom CSS site-wide (Settings, Super Admin) and per quiz (quiz settings), with the quiz's CSS overriding the site's. See "Images and custom CSS" below.
+- **Copy, export, import and activity**: **Duplicate** a quiz as a draft (from the quiz list or its settings), **Export** a quiz with its images as a `.quiz.json` file and **Import** it here or on another site (always as a new draft), and an **Activity** log of who changed what. See "Copying quizzes and the activity log" below.
 
 See the build order in SPEC.md for what comes next.
 
@@ -172,3 +173,9 @@ Copy the snippet from the quiz's settings page (Delivery section) into any web p
 | Site header / footer | `.pltq-site-header`, `.pltq-site-footer` |
 
 The list lives in `src/lib/content/css-hooks.ts`.
+
+## Copying quizzes and the activity log
+
+- **Duplicate** (quiz list or quiz settings → Copy and export) creates "Copy of …" as a draft at `{slug}-copy`, with its categories, questions, answers, responses, weights, settings, banner and CSS. Submissions and sessions are never copied.
+- **Export** downloads `{slug}.quiz.json`: the whole quiz with its images embedded, and no database ids. **Import** (Quizzes page) turns a file into a new draft; nothing existing changes. Files are checked like the editors check input: rich text is cleaned again, images go through the same upload checks (no SVG, 2 MB each), and CSS through the same rules. Import files can be up to 4 MB (Vercel's request limit), so a quiz with several large images may need smaller images first.
+- **Activity** (`/admin/activity`) lists who changed what and when, filterable by quiz, person, type and date (UTC). Each quiz's settings page shows its recent changes. Admins see quiz changes; Super Admins also see staff, settings and submission changes. PINs, CSS and respondent emails are never written to the log, only that they changed.

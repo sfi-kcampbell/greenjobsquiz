@@ -24,7 +24,11 @@ import {
   quizScoringInput,
 } from "@/lib/content/validation";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
+import { duplicateQuiz } from "@/lib/content/quiz-file";
 import { db } from "@/lib/db/client";
+import { quizzes } from "@/lib/db/schema";
 import { expireQuizPages } from "@/lib/public/page-cache";
 
 function readQuizForm(formData: FormData) {
@@ -40,6 +44,7 @@ export async function createQuizAction(_prev: FormState, formData: FormData): Pr
   let id: number;
   try {
     id = await createQuiz(db, readQuizForm(formData), staff.email);
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.create", quizId: id, summary: "Created the quiz" });
   } catch (error) {
     return failure(error);
   }
@@ -52,10 +57,11 @@ export async function updateQuizAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   try {
     await updateQuiz(db, id, readQuizForm(formData));
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.update", quizId: id, summary: "Edited the title, slug or introduction" });
   } catch (error) {
     return failure(error);
   }
@@ -65,10 +71,12 @@ export async function updateQuizAction(
 }
 
 export async function deleteQuizAction(quizId: number, _prev: FormState): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   try {
+    const [before] = await db.select({ title: quizzes.title }).from(quizzes).where(eq(quizzes.id, id)).limit(1);
     await deleteQuiz(db, id);
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.delete", quizTitle: before?.title ?? null, summary: `Deleted the quiz “${before?.title ?? id}”` });
   } catch (error) {
     return failure(error);
   }
@@ -82,7 +90,7 @@ export async function updateScoringAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   try {
     const input = quizScoringInput.parse({
@@ -91,6 +99,7 @@ export async function updateScoringAction(
       defaultResultId: formData.get("defaultResultId") || null,
     });
     await updateQuizScoring(db, id, input);
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.scoring", quizId: id, summary: "Changed scoring settings", details: input });
   } catch (error) {
     return failure(error);
   }
@@ -103,7 +112,7 @@ export async function updateRespondentOptionsAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   try {
     await updateQuizRespondentOptions(
@@ -115,6 +124,7 @@ export async function updateRespondentOptionsAction(
         retakeAllowed: formData.get("retakeAllowed") === "on",
       }),
     );
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.respondent", quizId: id, summary: "Changed respondent options" });
   } catch (error) {
     return failure(error);
   }
@@ -127,7 +137,7 @@ export async function updateDeliveryAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   try {
     await updateQuizDelivery(
@@ -140,6 +150,7 @@ export async function updateDeliveryAction(
         headlessBaseUrl: String(formData.get("headlessBaseUrl") ?? ""),
       }),
     );
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.delivery", quizId: id, summary: "Changed delivery settings" });
   } catch (error) {
     return failure(error);
   }
@@ -149,11 +160,12 @@ export async function updateDeliveryAction(
 }
 
 export async function setQuizStatusAction(quizId: number, status: "draft" | "published"): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   if (status !== "draft" && status !== "published") return { error: "Unknown status." };
   try {
     await setQuizStatus(db, id, status);
+    await recordAudit(db, staff, { scope: "quiz", action: status === "published" ? "quiz.publish" : "quiz.unpublish", quizId: id, summary: status === "published" ? "Published the quiz" : "Unpublished the quiz" });
   } catch (error) {
     return failure(error);
   }
@@ -163,7 +175,7 @@ export async function setQuizStatusAction(quizId: number, status: "draft" | "pub
 }
 
 export async function updateBannerAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   const removing = formData.get("intent") === "remove";
   try {
@@ -175,6 +187,7 @@ export async function updateBannerAction(quizId: number, _prev: FormState, formD
         alt: formData.get("decorative") ? "" : String(formData.get("alt") ?? ""),
       }),
     );
+    await recordAudit(db, staff, { scope: "quiz", action: removing ? "quiz.banner_remove" : "quiz.banner", quizId: id, summary: removing ? "Removed the banner" : "Changed the banner" });
   } catch (error) {
     return failure(error);
   }
@@ -184,15 +197,31 @@ export async function updateBannerAction(quizId: number, _prev: FormState, formD
 }
 
 export async function updateQuizCssAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
-  await requireStaff();
+  const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   try {
     const { css } = z.object({ css: customCssInput }).parse({ css: String(formData.get("css") ?? "") });
     await updateQuizCss(db, id, css);
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.css", quizId: id, summary: "Changed the quiz CSS", details: { characters: css.length } });
   } catch (error) {
     return failure(error);
   }
   expireQuizPages();
   revalidatePath("/admin/quizzes", "layout");
   return { ok: true, message: "Quiz CSS saved." };
+}
+
+export async function duplicateQuizAction(quizId: number): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  let newId: number;
+  try {
+    newId = await duplicateQuiz(db, id, staff.email);
+    const [source] = await db.select({ title: quizzes.title }).from(quizzes).where(eq(quizzes.id, id)).limit(1);
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.duplicate", quizId: newId, summary: `Created as a copy of “${source?.title ?? id}”`, details: { sourceQuizId: id } });
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes");
+  redirect(`/admin/quizzes/${newId}`);
 }

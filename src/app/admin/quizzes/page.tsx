@@ -5,6 +5,7 @@ import { requireStaff } from "@/lib/auth/access";
 import { listQuizzes } from "@/lib/content/quizzes";
 import { db } from "@/lib/db/client";
 import { NewQuizForm } from "./new-quiz-form";
+import { DuplicateQuizButton, ImportQuizForm } from "./quiz-file-controls";
 
 export const metadata: Metadata = { title: "Quizzes" };
 
@@ -23,6 +24,13 @@ export default async function QuizzesPage() {
           New quiz
         </h2>
         <NewQuizForm />
+      </section>
+
+      <section aria-labelledby="import-quiz" className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+        <h2 id="import-quiz" className="font-semibold">
+          Import a quiz
+        </h2>
+        <ImportQuizForm />
       </section>
 
       {quizzes.length === 0 ? (
@@ -67,6 +75,7 @@ export default async function QuizzesPage() {
                       <Link href={`/admin/quizzes/${quiz.id}`} className="text-brand underline underline-offset-4">
                         Settings
                       </Link>
+                      <DuplicateQuizButton quizId={quiz.id} title={quiz.title} />
                     </div>
                   </td>
                 </tr>

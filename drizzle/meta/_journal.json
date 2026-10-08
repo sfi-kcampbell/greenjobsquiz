@@ -29,6 +29,13 @@
       "when": 1791477113439,
       "tag": "0003_staff_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791491262397,
+      "tag": "0004_audit_events",
+      "breakpoints": true
     }
   ]
 }
