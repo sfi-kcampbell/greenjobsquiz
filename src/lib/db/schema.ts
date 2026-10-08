@@ -419,3 +419,29 @@ export const media = pgTable(
   },
   (t) => [index("media_quiz").on(t.quizId)],
 );
+
+/* -------------------------------------------------------------------------- */
+/* Audit log                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Who changed what, and when. Never holds secrets (PINs), CSS bodies or
+ * respondent emails: only that something changed.
+ */
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    actorEmail: text().notNull(),
+    /** "quiz" events are visible to Admins; "staff", "settings" and "submissions" to Super Admins only. */
+    scope: text().$type<"quiz" | "staff" | "settings" | "submissions">().notNull(),
+    action: text().notNull(),
+    quizId: integer().references(() => quizzes.id, { onDelete: "set null" }),
+    /** The quiz's title when the event happened (survives renames and deletion). */
+    quizTitle: text(),
+    summary: text().notNull(),
+    details: jsonb(),
+  },
+  (t) => [index("audit_events_at").on(t.at), index("audit_events_quiz_at").on(t.quizId, t.at), index("audit_events_actor").on(t.actorEmail)],
+);

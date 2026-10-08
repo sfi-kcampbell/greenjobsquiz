@@ -7,6 +7,7 @@ import { requireSuperAdmin } from "@/lib/auth/access";
 import { revokeAllStaffPins, revokeStaffPin, setStaffPin } from "@/lib/auth/staff-pins-store";
 import { isSuperAdminEmail, normalizeEmail } from "@/lib/auth/super-admins";
 import { appUrl } from "@/lib/app-url";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db/client";
 import { sessions, staffUsers, users } from "@/lib/db/schema";
 import { buttonEmail, sendEmail } from "@/lib/mail";
@@ -45,6 +46,7 @@ export async function inviteAdmin(_prev: InviteState, formData: FormData): Promi
   if (inserted.length === 0) {
     return { error: `${email} is already on the staff list.` };
   }
+  await recordAudit(db, me, { scope: "staff", action: "staff.invite", summary: `Invited ${email} as an Admin` });
 
   revalidatePath("/admin/staff");
 
@@ -77,7 +79,7 @@ async function endSessionsFor(email: string) {
 }
 
 export async function setAdminDisabled(formData: FormData): Promise<void> {
-  await requireSuperAdmin();
+  const me = await requireSuperAdmin();
   const id = idSchema.parse(formData.get("id"));
   const disable = formData.get("disable") === "true";
 
@@ -88,11 +90,14 @@ export async function setAdminDisabled(formData: FormData): Promise<void> {
     .returning({ email: staffUsers.email });
 
   if (row && disable) await endSessionsFor(row.email);
+  if (row) {
+    await recordAudit(db, me, { scope: "staff", action: disable ? "staff.disable" : "staff.enable", summary: `${disable ? "Disabled" : "Re-enabled"} ${row.email}` });
+  }
   revalidatePath("/admin/staff");
 }
 
 export async function removeAdmin(formData: FormData): Promise<void> {
-  await requireSuperAdmin();
+  const me = await requireSuperAdmin();
   const id = idSchema.parse(formData.get("id"));
 
   const [row] = await db
@@ -100,7 +105,10 @@ export async function removeAdmin(formData: FormData): Promise<void> {
     .where(eq(staffUsers.id, id))
     .returning({ email: staffUsers.email });
 
-  if (row) await endSessionsFor(row.email);
+  if (row) {
+    await endSessionsFor(row.email);
+    await recordAudit(db, me, { scope: "staff", action: "staff.remove", summary: `Removed ${row.email}` });
+  }
   revalidatePath("/admin/staff");
 }
 
@@ -111,24 +119,29 @@ export type PinState = { pin?: string; email?: string; error?: string; revoked?:
  * The PIN goes back to the Super Admin's form once; only its hash is stored.
  */
 export async function createAdminPin(id: number, _prev: PinState, formData: FormData): Promise<PinState> {
-  await requireSuperAdmin();
+  const me = await requireSuperAdmin();
   const adminId = idSchema.parse(id);
   if (formData.get("intent") === "revoke") {
     const email = await revokeStaffPin(db, adminId);
     if (!email) return { error: "That Admin no longer exists." };
     await endSessionsFor(email);
+    await recordAudit(db, me, { scope: "staff", action: "staff.pin_revoke", summary: `Revoked ${email}'s sign-in PIN` });
     revalidatePath("/admin/staff");
     return { revoked: true, email };
   }
   const created = await setStaffPin(db, adminId);
   if (!created) return { error: "That Admin no longer exists." };
   await endSessionsFor(created.email);
+  // Never the PIN itself.
+  await recordAudit(db, me, { scope: "staff", action: "staff.pin_set", summary: `Created a new sign-in PIN for ${created.email}` });
   revalidatePath("/admin/staff");
   return created;
 }
 
 export async function revokeAllPins(): Promise<void> {
-  await requireSuperAdmin();
-  for (const email of await revokeAllStaffPins(db)) await endSessionsFor(email);
+  const me = await requireSuperAdmin();
+  const emails = await revokeAllStaffPins(db);
+  for (const email of emails) await endSessionsFor(email);
+  await recordAudit(db, me, { scope: "staff", action: "staff.pin_revoke_all", summary: `Revoked all Admin sign-in PINs (${emails.length})` });
   revalidatePath("/admin/staff");
 }

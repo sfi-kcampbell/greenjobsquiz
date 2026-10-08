@@ -18,6 +18,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const nav = [
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/quizzes", label: "Quizzes" },
+    { href: "/admin/activity", label: "Activity" },
     ...(isSuper
       ? [
           { href: "/admin/submissions", label: "Submissions" },
