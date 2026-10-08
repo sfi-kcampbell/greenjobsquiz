@@ -5,8 +5,9 @@ import { requireSuperAdmin } from "@/lib/auth/access";
 import { listSuperAdmins } from "@/lib/auth/super-admins";
 import { db } from "@/lib/db/client";
 import { staffUsers } from "@/lib/db/schema";
-import { removeAdmin, setAdminDisabled } from "./actions";
+import { removeAdmin, revokeAllPins, setAdminDisabled } from "./actions";
 import { InviteForm } from "./invite-form";
+import { PinControl } from "./pin-control";
 
 export const metadata: Metadata = { title: "Staff" };
 
@@ -44,6 +45,10 @@ export default async function StaffPage() {
           Admins
         </h2>
         <p className="text-sm text-muted">Admins can create, edit and publish quizzes.</p>
+        <p className="max-w-2xl text-sm text-muted">
+          Until email sign-in is set up, give each Admin a sign-in PIN (Create PIN). It&apos;s shown once; only a
+          hash is stored. Super Admins sign in with the shared <code>SECRET_PIN</code>.
+        </p>
         <InviteForm />
 
         {admins.length === 0 ? (
@@ -57,6 +62,7 @@ export default async function StaffPage() {
                   <th scope="col" className="px-4 py-2 font-medium">Name</th>
                   <th scope="col" className="px-4 py-2 font-medium">Status</th>
                   <th scope="col" className="px-4 py-2 font-medium">Invited</th>
+                  <th scope="col" className="px-4 py-2 font-medium">Sign-in PIN</th>
                   <th scope="col" className="px-4 py-2 font-medium">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -79,6 +85,10 @@ export default async function StaffPage() {
                       <td className="px-4 py-3 text-muted">
                         {dateFormat.format(admin.createdAt)}
                         {admin.invitedBy ? ` by ${admin.invitedBy}` : ""}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <p className="mb-1 text-muted">{admin.pinSetAt ? `Set ${dateFormat.format(admin.pinSetAt)}` : "None"}</p>
+                        <PinControl id={admin.id} email={admin.email} hasPin={admin.pinHash !== null} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-3">
@@ -107,6 +117,16 @@ export default async function StaffPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {admins.some((a) => a.pinHash !== null) && (
+          <form action={revokeAllPins}>
+            <ConfirmSubmit
+              confirmMessage="Revoke every Admin's PIN? They're all signed out and can only sign in by email until you create new PINs."
+              className="rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger/10"
+            >
+              Revoke all PINs
+            </ConfirmSubmit>
+          </form>
         )}
       </section>
     </div>

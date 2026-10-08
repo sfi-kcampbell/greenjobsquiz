@@ -104,6 +104,9 @@ export const staffUsers = pgTable("staff_users", {
   role: text().$type<"admin">().notNull().default("admin"),
   invitedBy: text(),
   disabledAt: timestamp({ withTimezone: true }),
+  /** Temporary sign-in PIN (scrypt hash; the PIN itself is never stored). */
+  pinHash: text(),
+  pinSetAt: timestamp({ withTimezone: true }),
   createdAt: createdAt(),
 });
 

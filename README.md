@@ -33,12 +33,12 @@ Anyone else is refused at sign-in. Disabling or removing an Admin signs them out
 
 ## Temporary PIN sign-in
 
-Until Resend is configured, staff can sign in with their email plus a shared PIN:
+Until Resend is configured, staff can sign in on `/sign-in` with their email plus a PIN (the **Sign in with PIN** card):
 
-1. In Vercel, set `SECRET_PIN` (at least 6 characters; longer is better) and redeploy.
-2. On `/sign-in`, use the **Sign in with PIN** card. The email must still be a Super Admin or an active Admin.
+- **Admins** each get their own PIN. On **Staff**, a Super Admin clicks **Create PIN** next to the Admin. The PIN (like `ABCD-EFGH-JKMN`) is shown once to pass on; only an scrypt hash is stored. It keeps working until it's reset or revoked, or the Admin is disabled or removed. Resetting or revoking signs that Admin out everywhere. Case, spaces and dashes don't matter when typing it.
+- **Super Admins** use the shared `SECRET_PIN` (set it in Vercel, at least 6 characters, and redeploy). It doesn't work for Admins, and an Admin's PIN doesn't work for a Super Admin.
 
-PIN sessions last 12 hours. Attempts are limited to 5 per 15 minutes per IP address and 30 per 15 minutes overall. **Delete `SECRET_PIN` and redeploy before launch**; the PIN option disappears as soon as the variable is gone.
+The PIN card shows while `SECRET_PIN` is set or any active Admin has a PIN. PIN sessions last 12 hours. Attempts are limited to 5 per 15 minutes per IP address and 30 per 15 minutes overall, and a wrong PIN, an unknown email or an Admin without a PIN all get the same answer. **Before launch:** click **Revoke all PINs** on Staff, delete `SECRET_PIN` and redeploy; the PIN option disappears.
 
 ## Public API (`/api/v1`)
 

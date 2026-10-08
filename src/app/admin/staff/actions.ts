@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSuperAdmin } from "@/lib/auth/access";
+import { revokeAllStaffPins, revokeStaffPin, setStaffPin } from "@/lib/auth/staff-pins-store";
 import { isSuperAdminEmail, normalizeEmail } from "@/lib/auth/super-admins";
 import { appUrl } from "@/lib/app-url";
 import { db } from "@/lib/db/client";
@@ -100,5 +101,34 @@ export async function removeAdmin(formData: FormData): Promise<void> {
     .returning({ email: staffUsers.email });
 
   if (row) await endSessionsFor(row.email);
+  revalidatePath("/admin/staff");
+}
+
+export type PinState = { pin?: string; email?: string; error?: string; revoked?: boolean };
+
+/**
+ * Creates or replaces an Admin's sign-in PIN and signs them out everywhere.
+ * The PIN goes back to the Super Admin's form once; only its hash is stored.
+ */
+export async function createAdminPin(id: number, _prev: PinState, formData: FormData): Promise<PinState> {
+  await requireSuperAdmin();
+  const adminId = idSchema.parse(id);
+  if (formData.get("intent") === "revoke") {
+    const email = await revokeStaffPin(db, adminId);
+    if (!email) return { error: "That Admin no longer exists." };
+    await endSessionsFor(email);
+    revalidatePath("/admin/staff");
+    return { revoked: true, email };
+  }
+  const created = await setStaffPin(db, adminId);
+  if (!created) return { error: "That Admin no longer exists." };
+  await endSessionsFor(created.email);
+  revalidatePath("/admin/staff");
+  return created;
+}
+
+export async function revokeAllPins(): Promise<void> {
+  await requireSuperAdmin();
+  for (const email of await revokeAllStaffPins(db)) await endSessionsFor(email);
   revalidatePath("/admin/staff");
 }
