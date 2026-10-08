@@ -14,6 +14,7 @@ export async function saveAndRespond(
     entries: { questionId: number; answerIds: number[] }[];
     clientRevision?: number;
     currentIndex?: number;
+    code?: string;
   },
 ) {
   const identity = identify(req, input.sessionKey);
@@ -26,6 +27,7 @@ export async function saveAndRespond(
     clientRevision: input.clientRevision,
     currentIndex: input.currentIndex,
     ipHash: await clientIpHash(),
+    code: input.code ?? null,
   });
 
   const body = {

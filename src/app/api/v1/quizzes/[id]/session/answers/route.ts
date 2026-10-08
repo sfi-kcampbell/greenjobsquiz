@@ -14,6 +14,8 @@ const body = z.object({
     .max(200),
   clientRevision: z.number().int().nonnegative().optional(),
   currentIndex: z.number().int().min(0).max(1000).optional(),
+  /** A quiz code (from the link or typed in); used only when this save starts a new attempt. */
+  code: z.string().max(40).optional(),
 });
 
 /** Batch save, used to flush unsent answers when the page closes. */
@@ -25,6 +27,7 @@ export const POST = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/qu
     entries: input.answers,
     clientRevision: input.clientRevision,
     currentIndex: input.currentIndex,
+    code: input.code,
   });
 });
 

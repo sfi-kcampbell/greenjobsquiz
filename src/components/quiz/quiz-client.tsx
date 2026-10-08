@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import type { PublicQuestion } from "@/lib/public/structure";
 import { ApiError, embedIdentity, quizApi, type Answers, type SessionResponse } from "./api";
+import { CodeEntry } from "./code-entry";
 import { errorMessage, saveErrorMessage } from "./messages";
 import { Progress } from "./progress";
 import { QuestionView } from "./question-view";
@@ -12,6 +13,9 @@ import { ReviewView } from "./review-view";
 import { SinglePageView } from "./single-page-view";
 import { SaveQueue } from "./save-queue";
 import { answeredCount, currentQuestion, firstProblem, initialState, isSavable, quizReducer } from "./state";
+
+/** The quiz code for this visit, per quiz; read by the API client when an attempt starts. */
+const visitCodes = new Map<number, string>();
 
 const answeredIn = (answers: Answers) => Object.values(answers).filter((ids) => ids.length > 0).length;
 
@@ -44,7 +48,12 @@ export function QuizClient({
   mode?: "hosted" | "embed";
 }) {
   const identity = useMemo(() => (mode === "embed" ? embedIdentity() : null), [mode]);
-  const api = useMemo(() => quizApi(quizId, identity), [quizId, identity]);
+  // The quiz code for this visit (from ?code= or typed in), sent when an attempt starts.
+  const [code, setCode] = useState<string | null>(null);
+  const [codeChecking, setCodeChecking] = useState(true);
+  const [codeNotice, setCodeNotice] = useState<string | null>(null);
+  const api = useMemo(() => quizApi(quizId, identity, () => visitCodes.get(quizId) ?? null), [quizId, identity]);
+  const codeKey = `pltq:code:${quizId}`;
   const [state, dispatch] = useReducer(quizReducer, initialState);
   const rootRef = useRef<HTMLDivElement>(null);
   const queue = useMemo(
@@ -67,6 +76,66 @@ export function QuizClient({
   const emit = useCallback((name: string, detail: Record<string, unknown>) => {
     rootRef.current?.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: { quizId, ...detail } }));
   }, [quizId]);
+
+  /* --------------------------------- Code -------------------------------- */
+
+  const applyCode = useCallback(
+    (value: string | null) => {
+      if (value) visitCodes.set(quizId, value);
+      else visitCodes.delete(quizId);
+      setCode(value);
+      const storage = safeSessionStorage();
+      try {
+        if (value) storage?.setItem(codeKey, value);
+        else storage?.removeItem(codeKey);
+      } catch {
+        // memory only
+      }
+    },
+    [codeKey, quizId],
+  );
+
+  /** Checks a code with the server; returns a message for the respondent, or null when it's accepted. */
+  const checkCode = useCallback(
+    async (value: string): Promise<string | null> => {
+      try {
+        const res = await api.checkCode(value);
+        if (res.valid) {
+          applyCode(res.code);
+          return null;
+        }
+        return res.opensAt
+          ? `${res.message} It opens on ${new Date(res.opensAt).toLocaleDateString(undefined, { dateStyle: "long", timeZone: "UTC" })}.`
+          : res.message;
+      } catch (error) {
+        return errorMessage(error);
+      }
+    },
+    [api, applyCode],
+  );
+
+  // A code from the link (/q/CODE or ?code=), or one entered earlier in this visit.
+  useEffect(() => {
+    let given: string | null = null;
+    try {
+      given = new URLSearchParams(window.location.search).get("code") ?? safeSessionStorage()?.getItem(codeKey) ?? null;
+    } catch {
+      given = null;
+    }
+    let cancelled = false;
+    (async () => {
+      const problem = given ? await checkCode(given) : null;
+      if (cancelled) return;
+      if (problem) {
+        applyCode(null);
+        setCodeNotice(problem);
+      }
+      setCodeChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyCode, checkCode, codeKey]);
 
   /* --------------------------------- Load -------------------------------- */
 
@@ -134,7 +203,7 @@ export function QuizClient({
     // Embeds identify by key, not cookie; sendBeacon can't set headers, so it goes in the body.
     const sessionKeyForBeacon = () => {
       const key = identity?.get();
-      return key ? { sessionKey: key } : {};
+      return { ...(key ? { sessionKey: key } : {}), ...(visitCodes.has(quizId) ? { code: visitCodes.get(quizId) } : {}) };
     };
     const flushOnExit = () => {
       if (typeof navigator.sendBeacon === "function") queue.beacon(url, (u, data) => navigator.sendBeacon(u, data), sessionKeyForBeacon());
@@ -255,14 +324,22 @@ export function QuizClient({
       {(state.phase === "loading" || state.phase === "intro") && (
         <div className="flex flex-col gap-6">
           {intro}
+          {quiz?.settings.requireCode && !code && !codeChecking && state.phase === "intro" ? (
+            <CodeEntry check={checkCode} initialError={codeNotice} />
+          ) : (
           <div>
+            {codeNotice && !quiz?.settings.requireCode && (
+              <p role="status" className="mb-3 text-sm text-muted">
+                {codeNotice} You can still take the quiz.
+              </p>
+            )}
             <button
               type="button"
               onClick={() => dispatch({ type: "start" })}
-              disabled={state.phase === "loading"}
+              disabled={state.phase === "loading" || codeChecking}
               className="pltq-button pltq-button--primary rounded-md border border-transparent bg-brand px-6 py-3 text-lg font-medium text-white hover:bg-brand-strong disabled:opacity-60"
             >
-              {state.phase === "loading" ? "Loading…" : "Start"}
+              {state.phase === "loading" || codeChecking ? "Loading…" : "Start"}
             </button>
             {quiz && (
               <p className="mt-2 text-sm text-muted">
@@ -270,6 +347,7 @@ export function QuizClient({
               </p>
             )}
           </div>
+          )}
         </div>
       )}
 

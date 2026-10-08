@@ -144,6 +144,8 @@ export const quizzes = pgTable(
     bannerAlt: text(),
     /** Quiz CSS, after (so overriding) the site-wide CSS in settings. */
     customCss: text().notNull().default(""),
+    /** Only people with a quiz code can start an attempt. */
+    requireCode: boolean().notNull().default(false),
     structureVersion: integer().notNull().default(1),
 
     createdBy: text(),
@@ -293,6 +295,8 @@ export const quizSessions = pgTable(
     answers: jsonb().$type<Record<string, number[]>>().notNull().default({}),
     revision: integer().notNull().default(1),
     submissionId: integer(),
+    /** The quiz code the attempt started with, if any. */
+    codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
     ipHash: char({ length: 64 }),
     startedAt: createdAt(),
     updatedAt: updatedAt(),
@@ -327,6 +331,7 @@ export const submissions = pgTable(
     ranked: jsonb().notNull(),
     answers: jsonb().notNull(),
     shareTokenHash: char({ length: 64 }).unique(),
+    codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
     shareExpiresAt: timestamp({ withTimezone: true }),
     email: text(),
     questionsAnswered: smallint().notNull().default(0),
@@ -343,6 +348,7 @@ export const submissions = pgTable(
     index("submissions_quiz_top_category").on(t.quizId, t.topCategoryId),
     index("submissions_email").on(t.email),
     uniqueIndex("submissions_session").on(t.sessionId),
+    index("submissions_code").on(t.codeId),
   ],
 );
 
@@ -444,4 +450,31 @@ export const auditEvents = pgTable(
     details: jsonb(),
   },
   (t) => [index("audit_events_at").on(t.at), index("audit_events_quiz_at").on(t.quizId, t.at), index("audit_events_actor").on(t.actorEmail)],
+);
+
+/* -------------------------------------------------------------------------- */
+/* Quiz codes                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Codes for mailers and classes: /q/{code}, a teacher summary, open/close dates. */
+export const quizCodes = pgTable(
+  "quiz_codes",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    quizId: integer()
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    /** Upper case A–Z and 0–9, 4–20 characters; unique across all quizzes. */
+    code: text().notNull().unique(),
+    label: text(),
+    opensAt: timestamp({ withTimezone: true }),
+    closesAt: timestamp({ withTimezone: true }),
+    /** Changing the salt changes the teacher link (and so revokes the old one). */
+    reportSalt: text().notNull(),
+    reportHash: char({ length: 64 }).notNull().unique(),
+    createdBy: text(),
+    createdAt: createdAt(),
+    archivedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [index("quiz_codes_quiz").on(t.quizId), check("quiz_codes_format", sql`${t.code} ~ '^[A-Z0-9]{4,20}$'`)],
 );

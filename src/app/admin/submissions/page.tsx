@@ -21,7 +21,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 export default async function SubmissionsPage({ searchParams }: PageProps<"/admin/submissions">) {
   await requireSuperAdmin();
   const query = parseListQuery(await searchParams);
-  const [{ rows, total, page, pages, per }, { quizOptions, responseOptions }] = await Promise.all([
+  const [{ rows, total, page, pages, per }, { quizOptions, responseOptions, codeOptions }] = await Promise.all([
     listSubmissions(db, query),
     listFilterOptions(db, query.quiz),
   ]);
@@ -32,6 +32,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
   const state = {
     quiz: query.quiz,
     response: query.response,
+    code: query.code,
     from: query.from,
     to: query.to,
     q: query.q,
@@ -50,6 +51,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
       sort: (query.sort === c.key ? (query.dir === "asc" ? "ascending" : "descending") : "none") as Column["sort"],
     })),
     { key: "top", label: "Top category", href: null, sort: "none" },
+    { key: "code", label: "Code", href: null, sort: "none" },
     { key: "answered", label: "Answered", href: sortHref("answered"), sort: query.sort === "answered" ? (query.dir === "asc" ? "ascending" : "descending") : "none" },
     { key: "time", label: "Time", href: sortHref("time"), sort: query.sort === "time" ? (query.dir === "asc" ? "ascending" : "descending") : "none" },
   ];
@@ -63,6 +65,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
     resultTitle: r.resultTitle,
     percent: r.percent,
     topCategory: r.topCategory,
+    code: r.code,
     answered: `${r.questionsAnswered}/${r.questionTotal}`,
     time: duration(r.durationSeconds),
     suspect: r.suspect,
@@ -76,9 +79,10 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
       <h1 className="text-2xl font-semibold">Submissions</h1>
       <Filters
         key={here} // remount on navigation so the inputs show the URL's values
-        values={{ quiz: query.quiz, response: query.response, from: query.from, to: query.to, q: query.q, sort: query.sort, dir: query.dir, per: query.per }}
+        values={{ quiz: query.quiz, response: query.response, code: query.code, from: query.from, to: query.to, q: query.q, sort: query.sort, dir: query.dir, per: query.per }}
         quizOptions={quizOptions}
         responseOptions={responseOptions}
+        codeOptions={codeOptions}
       />
 
       <section aria-labelledby="export" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">

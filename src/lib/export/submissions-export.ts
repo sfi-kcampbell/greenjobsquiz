@@ -10,13 +10,13 @@
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { filters, orderFor, type SubmissionListQuery } from "@/lib/admin/submissions";
 import type { Executor } from "@/lib/db/create";
-import { answers as answersTable, categories, quizzes, submissions } from "@/lib/db/schema";
+import { answers as answersTable, categories, quizCodes, quizzes, submissions } from "@/lib/db/schema";
 import { toPercentage } from "@/lib/scoring/engine";
 import { MAX_CELL_TEXT, stripHtml, type Cell } from "./csv";
 
 export const BATCH_SIZE = 500;
 
-type ExportRow = typeof submissions.$inferSelect & { quizTitle: string };
+type ExportRow = typeof submissions.$inferSelect & { quizTitle: string; code: string | null };
 type StoredCategory = { raw: number; normalized: number | null; label: string };
 type StoredScores = { categories: Record<string, StoredCategory> };
 type StoredAnswer = {
@@ -31,15 +31,16 @@ export async function* exportBatches(db: Executor, query: SubmissionListQuery, b
   const where = await filters(db, query);
   for (let offset = 0; ; offset += batchSize) {
     const rows = await db
-      .select({ s: submissions, quizTitle: quizzes.title })
+      .select({ s: submissions, quizTitle: quizzes.title, code: quizCodes.code })
       .from(submissions)
       .innerJoin(quizzes, eq(quizzes.id, submissions.quizId))
+      .leftJoin(quizCodes, eq(quizCodes.id, submissions.codeId))
       .where(where)
       .orderBy(...orderFor(query))
       .limit(batchSize)
       .offset(offset);
     if (rows.length === 0) return;
-    yield rows.map((r) => ({ ...r.s, quizTitle: r.quizTitle }));
+    yield rows.map((r) => ({ ...r.s, quizTitle: r.quizTitle, code: r.code }));
     if (rows.length < batchSize) return;
   }
 }
@@ -78,7 +79,7 @@ export async function wideCategories(db: Executor, query: SubmissionListQuery): 
     .sort((a, b) => (order.get(a.id) ?? 1e9 + a.id) - (order.get(b.id) ?? 1e9 + b.id));
 }
 
-const BASE_HEADERS = ["Submission ID", "Attempt", "Date (UTC)", "Quiz", "Email", "Matched response"];
+const BASE_HEADERS = ["Submission ID", "Attempt", "Date (UTC)", "Quiz", "Email", "Matched response", "Quiz code"];
 
 export function wideHeader(cats: WideCategory[]): string[] {
   return [
@@ -103,6 +104,7 @@ export function wideRow(s: ExportRow, cats: WideCategory[]): Cell[] {
     s.quizTitle,
     s.email,
     s.resultTitle,
+    s.code,
     s.rawSimilarity === null ? null : toPercentage(s.rawSimilarity),
     s.rawSimilarity,
     s.topCategoryId === null ? null : (scores[String(s.topCategoryId)]?.label ?? null),
@@ -145,6 +147,7 @@ export function longRows(s: ExportRow, details: Map<number, string>): Cell[][] {
     s.quizTitle,
     s.email,
     s.resultTitle,
+    s.code,
     i + 1,
     q.questionTitle,
     q.answers.map((a) => a.label).join("; "),

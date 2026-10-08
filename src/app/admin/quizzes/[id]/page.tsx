@@ -14,6 +14,9 @@ import { healthReport } from "@/lib/scoring/health";
 import { updateQuizCssAction } from "../actions";
 import { DuplicateQuizButton } from "../quiz-file-controls";
 import { BannerForm } from "./banner-form";
+import { CodesSection } from "./codes-section";
+import { codeDayValues } from "@/lib/content/quiz-code-rules";
+import { listCodes, suggestCode } from "@/lib/content/quiz-codes";
 import { loadBundle, loadQuiz } from "./load";
 import { DeliveryForm, EmbedSnippet } from "./delivery-form";
 import { PublishControl } from "./publish-control";
@@ -111,6 +114,29 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
           hint="Styles for this quiz only, on its page, embed and shared results. They come after the site-wide CSS, so a rule here wins over the same rule there (unless that one uses !important). Admin pages are never affected."
           previewUrl={quiz.status === "published" ? pageUrl : null}
           submitLabel="Save quiz CSS"
+        />
+      </section>
+
+      <section aria-labelledby="quiz-codes" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="quiz-codes" className="font-semibold">
+          Quiz codes
+        </h2>
+        <CodesSection
+          quizId={quiz.id}
+          requireCode={quiz.requireCode}
+          published={quiz.status === "published"}
+          origin={await requestOrigin()}
+          suggestion={suggestCode()}
+          codes={(await listCodes(db, quiz.id)).map((c) => ({
+            id: c.id,
+            code: c.code,
+            label: c.label,
+            ...codeDayValues(c),
+            status: c.status,
+            started: c.started,
+            finished: c.finished,
+            reportToken: c.reportToken,
+          }))}
         />
       </section>
 

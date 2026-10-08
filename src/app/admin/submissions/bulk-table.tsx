@@ -15,6 +15,7 @@ export type Row = {
   resultTitle: string | null;
   percent: number | null;
   topCategory: string | null;
+  code: string | null;
   answered: string;
   time: string;
   suspect: boolean;
@@ -121,6 +122,7 @@ export function BulkTable({ rows, columns, back }: { rows: Row[]; columns: Colum
                   )}
                 </td>
                 <td className="px-3 py-2">{r.topCategory ?? <span className="text-muted">—</span>}</td>
+                <td className="px-3 py-2 font-mono">{r.code ?? <span className="font-sans text-muted">—</span>}</td>
                 <td className="px-3 py-2 tabular-nums">{r.answered}</td>
                 <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                   {r.time}

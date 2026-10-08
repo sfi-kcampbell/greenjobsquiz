@@ -39,6 +39,8 @@ export type PublicQuiz = {
     retakeAllowed: boolean;
     autoAdvance: boolean;
     runnersUpCount: number;
+    /** New attempts need a quiz code (from the link, or typed in). */
+    requireCode: boolean;
   };
   structureVersion: number;
   questions: PublicQuestion[];
@@ -120,6 +122,7 @@ export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slu
       retakeAllowed: quiz.retakeAllowed,
       autoAdvance: quiz.autoAdvance,
       runnersUpCount: quiz.runnersUpCount,
+      requireCode: quiz.requireCode,
     },
     structureVersion: quiz.structureVersion,
     // Explicit field picks: weights are dropped here and must never be added.

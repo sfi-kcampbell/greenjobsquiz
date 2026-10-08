@@ -99,6 +99,7 @@ This is a greenfield project in this repo.
 | `media` | id (uuid), quiz_id (set null), content_type (png/jpeg/webp/gif), bytes (bytea, ≤ 2 MB), byte_size, width, height, filename, sha256 (unique: stored once), created_by, created_at |
 | `staff_users` | id, email (unique, lowercased), name, role (`admin`), invited_by, disabled_at, pin_hash (scrypt, temporary PIN sign-in), pin_set_at, created_at |
 | `audit_events` | id, at, actor_email, scope (`quiz`/`staff`/`settings`/`submissions`; Admins see `quiz` only), action (e.g. `question.update`), quiz_id (set null), quiz_title (as it was), summary, details (jsonb; never PINs, CSS or respondent emails) |
+| `quiz_codes` | id, quiz_id (cascade), code (unique, `A–Z0–9` 4–20, stored upper case), label, opens_at, closes_at (exclusive; whole UTC days), report_salt + report_hash (teacher link = HMAC of id and salt; a new salt revokes it), created_by, created_at, archived_at. `quiz_sessions.code_id` and `submissions.code_id` (set null) record the code; `quizzes.require_code` makes one necessary for new attempts |
 | Auth.js tables | users, accounts, sessions, verification_tokens (the standard Drizzle adapter) |
 
 **Answers get their own rows** rather than an array on the question, because IDs must be permanent.

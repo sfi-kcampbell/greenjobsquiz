@@ -27,7 +27,7 @@ const quiz: PublicQuiz = {
   introHtml: null,
   banner: null,
   layout: "stepped",
-  settings: { allowSkip: false, showProgress: true, retakeAllowed: true, autoAdvance: false, runnersUpCount: 2 },
+  settings: { allowSkip: false, showProgress: true, retakeAllowed: true, autoAdvance: false, runnersUpCount: 2, requireCode: false },
   structureVersion: 1,
   questions: [question(1), question(2, { required: false }), question(3)],
 };
