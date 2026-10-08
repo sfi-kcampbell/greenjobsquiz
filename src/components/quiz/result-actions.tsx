@@ -32,7 +32,7 @@ export function ResultActions({ shareToken }: { shareToken: string }) {
     }
   };
 
-  const button = "rounded-md border border-border bg-surface px-4 py-2 font-medium hover:bg-border/40";
+  const button = "pltq-button rounded-md border border-border bg-surface px-4 py-2 font-medium hover:bg-border/40";
   return (
     <section aria-labelledby="keep-result" className="no-print flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       <h3 id="keep-result" className="font-semibold">

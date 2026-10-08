@@ -4,10 +4,10 @@
  */
 import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Database, Executor } from "@/lib/db/create";
-import { categories, quizzes, results } from "@/lib/db/schema";
+import { categories, media, quizzes, results } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError, pgError, PG_FOREIGN_KEY_VIOLATION, PG_UNIQUE_VIOLATION } from "./errors";
-import type { QuizDeliveryInput, QuizInput, QuizRespondentInput, QuizScoringInput } from "./validation";
+import type { QuizBannerInput, QuizDeliveryInput, QuizInput, QuizRespondentInput, QuizScoringInput } from "./validation";
 
 export type QuizSummary = {
   id: number;
@@ -153,6 +153,31 @@ export async function updateQuizDelivery(db: Database, id: number, input: QuizDe
   await db.transaction(async (tx) => {
     await lockQuiz(tx, id);
     await tx.update(quizzes).set(input).where(eq(quizzes.id, id));
+    await bumpStructureVersion(tx, id);
+  });
+}
+
+/** Sets, replaces or (mediaId null) removes the banner image. */
+export async function updateQuizBanner(db: Database, id: number, input: QuizBannerInput): Promise<void> {
+  await db.transaction(async (tx) => {
+    await lockQuiz(tx, id);
+    if (input.mediaId) {
+      const [found] = await tx.select({ id: media.id }).from(media).where(eq(media.id, input.mediaId)).limit(1);
+      if (!found) throw new ContentError("invalid", "That image wasn't found. Upload it again.", "mediaId");
+    }
+    await tx
+      .update(quizzes)
+      .set({ bannerMediaId: input.mediaId, bannerAlt: input.mediaId ? input.alt : null })
+      .where(eq(quizzes.id, id));
+    await bumpStructureVersion(tx, id);
+  });
+}
+
+/** The quiz's own CSS (validated by customCssInput). */
+export async function updateQuizCss(db: Database, id: number, css: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await lockQuiz(tx, id);
+    await tx.update(quizzes).set({ customCss: css }).where(eq(quizzes.id, id));
     await bumpStructureVersion(tx, id);
   });
 }

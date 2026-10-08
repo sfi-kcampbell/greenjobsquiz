@@ -166,9 +166,20 @@ function setPublicCaching(res: NextResponse, maxAge = 300) {
   res.headers.set("CDN-Cache-Control", `public, s-maxage=${maxAge}, stale-while-revalidate=600`);
 }
 
+/**
+ * Uploaded images are stored as "/media/{id}" paths. API clients may live on
+ * another domain (headless front ends), so responses carry full addresses,
+ * on this request's own origin (a preview serves its own images).
+ */
+export function absolutizeMedia<T>(body: T, origin: string): T {
+  if (body === null || body === undefined) return body;
+  const text = JSON.stringify(body);
+  return text.includes('"/media/') ? (JSON.parse(text.replaceAll('"/media/', `"${origin}/media/`)) as T) : body;
+}
+
 export async function respond(req: NextRequest, body: unknown, opts: { status?: number; caching?: Caching } = {}) {
   const caching = opts.caching ?? { kind: "none" };
-  const res = NextResponse.json(body, { status: opts.status ?? 200 });
+  const res = NextResponse.json(absolutizeMedia(body, ownOrigin(req)), { status: opts.status ?? 200 });
   if (caching.kind === "public") {
     setPublicCaching(res, caching.maxAge);
     if (caching.etag) res.headers.set("ETag", caching.etag);

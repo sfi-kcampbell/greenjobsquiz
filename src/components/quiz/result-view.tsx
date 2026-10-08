@@ -32,7 +32,7 @@ export function ResultView({
   const earlier = attempts.filter((a) => a.attemptNo !== result.attemptNo).reverse();
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="pltq-result flex flex-col gap-8">
       <ResultBody result={result} headingRef={headingRef} />
       {shareToken && <ResultActions shareToken={shareToken} />}
 
@@ -61,7 +61,7 @@ export function ResultView({
       {onRetake && (
         <div className="no-print flex flex-col items-start gap-2">
           {error && (
-            <p role="alert" className="font-medium text-danger">
+            <p role="alert" className="pltq-error font-medium text-danger">
               {error}
             </p>
           )}
@@ -69,7 +69,7 @@ export function ResultView({
             type="button"
             onClick={onRetake}
             disabled={restarting}
-            className="rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
+            className="pltq-button rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
           >
             {restarting ? "Starting over…" : "Take it again"}
           </button>

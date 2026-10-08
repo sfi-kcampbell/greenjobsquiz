@@ -27,3 +27,16 @@ export async function updateAccessSettings(db: Executor, input: AccessSettingsIn
       set: { embedOrigins: input.embedOrigins, corsOrigins: input.corsOrigins, updatedAt: new Date() },
     });
 }
+
+export async function getSiteCss(db: Executor): Promise<string> {
+  const [row] = await db.select({ css: settings.customCss }).from(settings).where(eq(settings.id, 1)).limit(1);
+  return row?.css ?? "";
+}
+
+/** Site-wide CSS (validated by customCssInput). */
+export async function updateSiteCss(db: Executor, css: string): Promise<void> {
+  await db
+    .insert(settings)
+    .values({ id: 1, customCss: css })
+    .onConflictDoUpdate({ target: settings.id, set: { customCss: css, updatedAt: new Date() } });
+}

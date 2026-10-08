@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   accessSettingsInput,
+  CSS_MAX,
+  cssProblem,
+  customCssInput,
   categoryInput,
   normalizeOrigin,
   quizDeliveryInput,
@@ -221,5 +224,30 @@ describe("origins", () => {
     const bad = accessSettingsInput.safeParse({ embedOrigins: "https://a.org\nhttps://b.org/x", corsOrigins: "" });
     expect(bad.success).toBe(false);
     expect(bad.error!.issues[0].message).toMatch(/Line 2/);
+  });
+});
+
+describe("custom CSS", () => {
+  const bad = (css: string) => cssProblem(css);
+  it("accepts ordinary CSS, local and data: urls", () => {
+    expect(bad(".pltq-question { border-left: 4px solid red; }")).toBeNull();
+    expect(bad('.pltq-banner { background: url("/media/0b4e7a0e-5c1b-4a5e-9f00-111111111111") }')).toBeNull();
+    expect(bad("@font-face { src: url(data:font/woff2;base64,AAAA) }")).toBeNull();
+    expect(bad('.x::before { content: "Note: \\2014" }')).toBeNull();
+  });
+  it("refuses anything that could close the style element", () => {
+    expect(bad("a{}\n</style><script>alert(1)</script>")).toMatch(/^Line 2: .*"<"/);
+  });
+  it("refuses loading from other sites, even when escaped", () => {
+    expect(bad('@import "https://evil.example/x.css";')).toMatch(/@import/);
+    expect(bad("@\\69mport 'x.css';")).toMatch(/@import/);
+    expect(bad("a { background: url(https://evil.example/p.gif) }")).toMatch(/outside this site/);
+    expect(bad("a { background: u\\72l(//evil.example/p.gif) }")).toMatch(/outside this site/);
+    expect(bad('a { background: image-set("https://evil.example/p.png" 1x) }')).toMatch(/outside this site/);
+    expect(bad("a { width: expression(alert(1)) }")).toMatch(/expression/);
+  });
+  it("normalizes line endings and caps the length", () => {
+    expect(customCssInput.parse("a{}\r\nb{}")).toBe("a{}\nb{}");
+    expect(customCssInput.safeParse("a".repeat(CSS_MAX + 1)).success).toBe(false);
   });
 });

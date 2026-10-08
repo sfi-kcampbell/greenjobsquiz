@@ -29,7 +29,7 @@ export function ReviewView({
   }, []);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="pltq-review flex flex-col gap-6">
       <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold focus:outline-none sm:text-2xl">
         Check your answers
       </h2>
@@ -66,7 +66,7 @@ export function ReviewView({
         })}
       </ol>
       {error && (
-        <p role="alert" className="font-medium text-danger">
+        <p role="alert" className="pltq-error font-medium text-danger">
           {error}
         </p>
       )}
@@ -75,7 +75,7 @@ export function ReviewView({
           type="button"
           onClick={onBack}
           disabled={busy}
-          className="rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
+          className="pltq-button rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
         >
           Back
         </button>
@@ -83,7 +83,7 @@ export function ReviewView({
           type="button"
           onClick={onSubmit}
           disabled={busy}
-          className="ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          className="pltq-button pltq-button--primary ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
           {busy ? "Working out your result…" : "See my result"}
         </button>

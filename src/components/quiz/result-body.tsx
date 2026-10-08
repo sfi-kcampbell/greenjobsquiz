@@ -13,11 +13,11 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
 
   return (
     <>
-      <section aria-labelledby="result-title" className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6">
+      <section aria-labelledby="result-title" className="pltq-response flex flex-col gap-4 rounded-xl border border-border bg-surface p-6">
         <p className="text-sm font-medium uppercase tracking-wide text-muted">Your best match</p>
         {match ? (
           <>
-            <h2 id="result-title" ref={headingRef} tabIndex={-1} className="text-3xl font-semibold focus:outline-none">
+            <h2 id="result-title" ref={headingRef} tabIndex={-1} className="pltq-response-title text-3xl font-semibold focus:outline-none">
               {match.title}
             </h2>
             {match.percent !== null && !result.isFallback && (
@@ -39,7 +39,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
                   href={match.ctaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block rounded-md border border-transparent bg-brand px-5 py-2.5 font-medium text-white hover:bg-brand-strong"
+                  className="pltq-cta inline-block rounded-md border border-transparent bg-brand px-5 py-2.5 font-medium text-white hover:bg-brand-strong"
                 >
                   {match.ctaLabel}
                   <span className="sr-only"> (opens in a new tab)</span>
@@ -55,7 +55,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
       </section>
 
       {result.runnersUp.length > 0 && (
-        <section aria-labelledby="runners-up" className="flex flex-col gap-3">
+        <section aria-labelledby="runners-up" className="pltq-runners-up flex flex-col gap-3">
           <h3 id="runners-up" className="text-lg font-semibold">
             Also a good fit
           </h3>
@@ -74,7 +74,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
       )}
 
       {scores.length > 0 && (
-        <section aria-labelledby="profile" className="flex flex-col gap-3">
+        <section aria-labelledby="profile" className="pltq-profile flex flex-col gap-3">
           <h3 id="profile" className="text-lg font-semibold">
             Your profile
           </h3>
@@ -85,7 +85,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
                   <span className="font-medium">{s.label}</span>
                   <span className="tabular-nums text-muted">{s.percent}%</span>
                 </span>
-                <span aria-hidden className="meter-track block h-3 overflow-hidden rounded-full bg-border">
+                <span aria-hidden className="pltq-bar meter-track block h-3 overflow-hidden rounded-full bg-border">
                   <span className="meter-fill block h-full rounded-full" style={{ width: `${s.percent}%`, backgroundColor: s.color }} />
                 </span>
               </li>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { Banner } from "@/components/quiz/banner";
+import { CustomCss } from "@/components/quiz/custom-css";
 import { PageShell } from "@/components/quiz/page-shell";
 import { QuizClient } from "@/components/quiz/quiz-client";
 import { RichHtml } from "@/components/quiz/rich-html";
-import { getCachedQuizPage } from "@/lib/public/page-cache";
+import { getCachedQuizPage, getCachedSiteCss } from "@/lib/public/page-cache";
 
 /**
  * The hosted quiz page. Only the title and intro are rendered here, the same
@@ -35,11 +37,15 @@ export async function generateMetadata({ params }: PageProps<"/quizzes/[slug]">)
 }
 
 export default async function QuizPage({ params }: PageProps<"/quizzes/[slug]">) {
-  const { quiz, layoutTemplate } = await load((await params).slug);
+  const { quiz, layoutTemplate, customCss } = await load((await params).slug);
   return (
     <PageShell template={layoutTemplate}>
-      <h1 className="text-3xl font-semibold sm:text-4xl">{quiz.title}</h1>
-      <QuizClient quizId={quiz.id} intro={<RichHtml html={quiz.introHtml} className="text-lg" />} />
+      <CustomCss site={await getCachedSiteCss()} quiz={customCss} />
+      <div className="pltq-quiz flex flex-col gap-6">
+        <Banner banner={quiz.banner} />
+        <h1 className="pltq-title text-3xl font-semibold sm:text-4xl">{quiz.title}</h1>
+        <QuizClient quizId={quiz.id} intro={<RichHtml html={quiz.introHtml} className="pltq-intro text-lg" />} />
+      </div>
     </PageShell>
   );
 }

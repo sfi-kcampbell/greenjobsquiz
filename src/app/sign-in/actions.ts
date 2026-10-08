@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { signIn } from "@/auth";
 import { pinMatches, pinSignInEnabled } from "@/lib/auth/pin-check";
+import { verifyPin } from "@/lib/auth/staff-pin";
+import { anyStaffPins, staffPinMatches } from "@/lib/auth/staff-pins-store";
+import { isSuperAdminEmail } from "@/lib/auth/super-admins";
+import { db } from "@/lib/db/client";
 import { createStaffSession } from "@/lib/auth/pin-session";
 import { resolveStaff } from "@/lib/auth/staff";
 import { clientIpHash, hit } from "@/lib/rate-limit/fixed-window";
@@ -53,14 +57,14 @@ const PIN_LIMIT_PER_IP = 5;
 const PIN_LIMIT_GLOBAL = 30;
 
 /**
- * Temporary: email + SECRET_PIN sign-in while email sending isn't set up.
- * Only works while SECRET_PIN is set, and only for staff emails.
+ * Temporary sign-in while email sending isn't set up: Super Admins use
+ * SECRET_PIN, Admins use their own PIN from the Staff screen.
  */
 export async function signInWithPin(
   _prev: PinSignInState,
   formData: FormData,
 ): Promise<PinSignInState> {
-  if (!pinSignInEnabled()) return { error: "PIN sign-in is turned off." };
+  if (!pinSignInEnabled() && !(await anyStaffPins(db))) return { error: "PIN sign-in is turned off." };
 
   const raw = String(formData.get("email") ?? "");
 
@@ -77,7 +81,16 @@ export async function signInWithPin(
   const pin = String(formData.get("pin") ?? "");
   // Same message for a wrong PIN and a non-staff email, so neither can be probed.
   const incorrect = { email: raw, error: "Email or PIN is incorrect." };
-  if (!email.success || !pinMatches(pin)) return incorrect;
+  if (!email.success || !pin) return incorrect;
+  let matches: boolean;
+  if (isSuperAdminEmail(email.data)) {
+    // The dummy check keeps this path as slow as an Admin's, so timing doesn't reveal Super Admins.
+    await verifyPin(pin, null);
+    matches = pinMatches(pin);
+  } else {
+    matches = await staffPinMatches(db, email.data, pin);
+  }
+  if (!matches) return incorrect;
 
   const staff = await resolveStaff(email.data);
   if (!staff) return incorrect;

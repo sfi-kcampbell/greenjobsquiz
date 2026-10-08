@@ -25,6 +25,7 @@ const quiz: PublicQuiz = {
   slug: "q",
   title: "Quiz",
   introHtml: null,
+  banner: null,
   layout: "stepped",
   settings: { allowSkip: false, showProgress: true, retakeAllowed: true, autoAdvance: false, runnersUpCount: 2 },
   structureVersion: 1,

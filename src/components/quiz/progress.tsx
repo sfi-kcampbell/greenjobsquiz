@@ -2,7 +2,7 @@
 export function Progress({ answered, total }: { answered: number; total: number }) {
   const percent = total > 0 ? Math.round((100 * answered) / total) : 0;
   return (
-    <div className="flex items-center gap-3 text-sm text-muted">
+    <div className="pltq-progress flex items-center gap-3 text-sm text-muted">
       <div
         role="progressbar"
         aria-label="Questions answered"

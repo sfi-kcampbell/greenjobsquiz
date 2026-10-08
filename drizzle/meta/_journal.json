@@ -15,6 +15,20 @@
       "when": 1790997774381,
       "tag": "0001_category_unique_names",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791383781870,
+      "tag": "0002_media_and_custom_css",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791477113439,
+      "tag": "0003_staff_pins",
+      "breakpoints": true
     }
   ]
 }

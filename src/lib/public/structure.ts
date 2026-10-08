@@ -6,7 +6,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { listQuestions } from "@/lib/content/questions";
 import type { Executor } from "@/lib/db/create";
-import { quizzes } from "@/lib/db/schema";
+import { media, quizzes } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 
 /** Off-site links in what respondents see open in a new tab. */
@@ -23,11 +23,15 @@ export type PublicQuestion = {
   required: boolean;
   answers: PublicAnswer[];
 };
+export type PublicBanner = { url: string; alt: string; width: number; height: number };
+
 export type PublicQuiz = {
   id: number;
   slug: string;
   title: string;
   introHtml: string | null;
+  /** Image for the top of the quiz (relative URL here; the API makes it absolute). */
+  banner: PublicBanner | null;
   layout: "stepped" | "single_page";
   settings: {
     allowSkip: boolean;
@@ -54,14 +58,38 @@ export type QuizPageInfo = {
   deliveryMode: "hosted" | "headless";
   headlessBaseUrl: string | null;
   layoutTemplate: "default" | "canvas";
+  /** The quiz's own CSS (pages put it after the site-wide CSS). */
+  customCss: string;
 };
+
+async function bannerFor(db: Executor, mediaId: string | null, alt: string | null): Promise<PublicBanner | null> {
+  if (!mediaId) return null;
+  const [m] = await db.select({ width: media.width, height: media.height }).from(media).where(eq(media.id, mediaId)).limit(1);
+  return m ? { url: `/media/${mediaId}`, alt: alt ?? "", width: m.width, height: m.height } : null;
+}
+
+/** Banner and CSS for a quiz, published or not (the shared result page outlives publishing). */
+export async function getQuizBranding(db: Executor, quizId: number): Promise<{ banner: PublicBanner | null; customCss: string }> {
+  const [q] = await db
+    .select({ bannerMediaId: quizzes.bannerMediaId, bannerAlt: quizzes.bannerAlt, customCss: quizzes.customCss })
+    .from(quizzes)
+    .where(eq(quizzes.id, quizId))
+    .limit(1);
+  if (!q) return { banner: null, customCss: "" };
+  return { banner: await bannerFor(db, q.bannerMediaId, q.bannerAlt), customCss: q.customCss };
+}
 
 /** What the hosted and embed pages need: the public quiz plus how it's delivered. */
 export async function getPublishedQuizPage(db: Executor, slug: string): Promise<QuizPageInfo | null> {
   const quiz = await getPublishedQuiz(db, { slug });
   if (!quiz) return null;
   const [row] = await db
-    .select({ deliveryMode: quizzes.deliveryMode, headlessBaseUrl: quizzes.headlessBaseUrl, layoutTemplate: quizzes.layoutTemplate })
+    .select({
+      deliveryMode: quizzes.deliveryMode,
+      headlessBaseUrl: quizzes.headlessBaseUrl,
+      layoutTemplate: quizzes.layoutTemplate,
+      customCss: quizzes.customCss,
+    })
     .from(quizzes)
     .where(eq(quizzes.id, quiz.id))
     .limit(1);
@@ -84,6 +112,7 @@ export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slu
     slug: quiz.slug,
     title: quiz.title,
     introHtml: sanitizeRichText(quiz.introHtml, PUBLIC),
+    banner: await bannerFor(db, quiz.bannerMediaId, quiz.bannerAlt),
     layout: quiz.layout,
     settings: {
       allowSkip: quiz.allowSkip,

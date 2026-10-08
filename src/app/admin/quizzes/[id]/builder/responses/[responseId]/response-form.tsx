@@ -139,6 +139,7 @@ export function ResponseForm({
             <RichTextEditor
               id="resp-body"
               label="Description"
+              quizId={quizId}
               value={form.bodyHtml}
               onChange={(html) => update({ bodyHtml: html })}
             />

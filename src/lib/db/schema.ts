@@ -10,6 +10,7 @@ import {
   boolean,
   check,
   char,
+  customType,
   index,
   integer,
   jsonb,
@@ -20,8 +21,14 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+
+/** Postgres bytea ↔ Node Buffer (Drizzle has no built-in binary type). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 const createdAt = () => timestamp({ withTimezone: true }).notNull().defaultNow();
 const updatedAt = () =>
@@ -97,6 +104,9 @@ export const staffUsers = pgTable("staff_users", {
   role: text().$type<"admin">().notNull().default("admin"),
   invitedBy: text(),
   disabledAt: timestamp({ withTimezone: true }),
+  /** Temporary sign-in PIN (scrypt hash; the PIN itself is never stored). */
+  pinHash: text(),
+  pinSetAt: timestamp({ withTimezone: true }),
   createdAt: createdAt(),
 });
 
@@ -129,6 +139,11 @@ export const quizzes = pgTable(
       onDelete: "set null",
     }),
     resultHeadline: text(),
+    /** Image shown at the top of the quiz page, embed and result page. */
+    bannerMediaId: uuid().references((): AnyPgColumn => media.id, { onDelete: "set null" }),
+    bannerAlt: text(),
+    /** Quiz CSS, after (so overriding) the site-wide CSS in settings. */
+    customCss: text().notNull().default(""),
     structureVersion: integer().notNull().default(1),
 
     createdBy: text(),
@@ -375,7 +390,32 @@ export const settings = pgTable(
       .notNull()
       .default(sql`'{youtube.com,youtube-nocookie.com,vimeo.com}'::text[]`),
     retentionDays: integer(),
+    /** Site-wide CSS on every respondent-facing page (quiz CSS comes after it). */
+    customCss: text().notNull().default(""),
     updatedAt: updatedAt(),
   },
   (t) => [check("settings_single_row", sql`${t.id} = 1`)],
+);
+
+/**
+ * Uploaded images (rich text and banners), stored in Postgres. Bytes never
+ * change under an id, so /media/{id} is cached as immutable. Deduplicated
+ * by sha256.
+ */
+export const media = pgTable(
+  "media",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    quizId: integer().references((): AnyPgColumn => quizzes.id, { onDelete: "set null" }),
+    contentType: text().$type<"image/png" | "image/jpeg" | "image/webp" | "image/gif">().notNull(),
+    bytes: bytea().notNull(),
+    byteSize: integer().notNull(),
+    width: integer().notNull(),
+    height: integer().notNull(),
+    filename: text(),
+    sha256: char({ length: 64 }).notNull().unique(),
+    createdBy: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("media_quiz").on(t.quizId)],
 );

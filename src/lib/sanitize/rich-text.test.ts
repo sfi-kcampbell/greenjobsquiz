@@ -32,6 +32,21 @@ describe("sanitizeRichText", () => {
     expect(sanitizeRichText(html)).toBe(html);
   });
 
+  it("keeps images uploaded here, with only safe attributes", () => {
+    const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    expect(sanitizeRichText(`<p><img src="/media/${id}" alt="A fern" width="640" height="480" onerror="x()" style="a" class="b"></p>`)).toBe(
+      `<p><img src="/media/${id}" alt="A fern" width="640" height="480" /></p>`,
+    );
+    expect(sanitizeRichText(`<img src="/media/${id}">`)).toBe(`<img src="/media/${id}" alt="" />`); // alone, decorative
+    expect(sanitizeRichText(`<p><img src="/media/${id}" width="-5" height="1e9"></p>`)).toBe(`<p><img src="/media/${id}" alt="" /></p>`);
+  });
+
+  it("drops images from anywhere else", () => {
+    for (const src of ["https://evil.example/x.png", "//evil.example/x.png", "javascript:alert(1)", "data:image/png;base64,AAAA", "/media/../admin", "/media/not-a-uuid"]) {
+      expect(sanitizeRichText(`<p>Hi<img src="${src}"></p>`)).toBe("<p>Hi</p>");
+    }
+  });
+
   it("returns null for empty content", () => {
     expect(sanitizeRichText("")).toBeNull();
     expect(sanitizeRichText(null)).toBeNull();

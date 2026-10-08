@@ -260,7 +260,7 @@ export function QuizClient({
               type="button"
               onClick={() => dispatch({ type: "start" })}
               disabled={state.phase === "loading"}
-              className="rounded-md border border-transparent bg-brand px-6 py-3 text-lg font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+              className="pltq-button pltq-button--primary rounded-md border border-transparent bg-brand px-6 py-3 text-lg font-medium text-white hover:bg-brand-strong disabled:opacity-60"
             >
               {state.phase === "loading" ? "Loading…" : "Start"}
             </button>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Banner } from "@/components/quiz/banner";
+import { CustomCss } from "@/components/quiz/custom-css";
 import { EmbedBridge } from "@/components/quiz/embed-bridge";
 import { QuizClient } from "@/components/quiz/quiz-client";
 import { RichHtml } from "@/components/quiz/rich-html";
-import { getCachedQuizPage } from "@/lib/public/page-cache";
+import { getCachedQuizPage, getCachedSiteCss } from "@/lib/public/page-cache";
 
 /**
  * The quiz inside an <iframe> on another site. Identity uses a key in
@@ -28,12 +30,14 @@ export async function generateMetadata({ params }: PageProps<"/embed/[slug]">): 
 }
 
 export default async function EmbedPage({ params }: PageProps<"/embed/[slug]">) {
-  const { quiz } = await load((await params).slug);
+  const { quiz, customCss } = await load((await params).slug);
   return (
     <EmbedBridge>
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">{quiz.title}</h1>
-        <QuizClient quizId={quiz.id} mode="embed" intro={<RichHtml html={quiz.introHtml} className="text-lg" />} />
+      <CustomCss site={await getCachedSiteCss()} quiz={customCss} />
+      <main className="pltq-quiz mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
+        <Banner banner={quiz.banner} />
+        <h1 className="pltq-title text-2xl font-semibold sm:text-3xl">{quiz.title}</h1>
+        <QuizClient quizId={quiz.id} mode="embed" intro={<RichHtml html={quiz.introHtml} className="pltq-intro text-lg" />} />
       </main>
     </EmbedBridge>
   );

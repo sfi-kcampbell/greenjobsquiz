@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Banner } from "@/components/quiz/banner";
+import { CustomCss } from "@/components/quiz/custom-css";
 import { ResultBody } from "@/components/quiz/result-body";
+import { getSiteCss } from "@/lib/content/settings";
 import { db } from "@/lib/db/client";
 import { getResultByShareToken } from "@/lib/public/sessions";
+import { getQuizBranding } from "@/lib/public/structure";
 import { isToken } from "@/lib/public/tokens";
 import { AutoPrint } from "./auto-print";
 import { PrintButton } from "./print-button";
@@ -32,14 +36,18 @@ export async function generateMetadata({ params }: PageProps<"/quiz-result/[toke
 export default async function SharedResultPage({ params, searchParams }: PageProps<"/quiz-result/[token]">) {
   const result = await load((await params).token);
   const autoprint = (await searchParams).autoprint === "1";
+  const branding = await getQuizBranding(db, result.quiz.id);
+  const siteCss = await getSiteCss(db);
   const taken = new Date(result.createdAt).toLocaleDateString("en", { dateStyle: "long", timeZone: "UTC" });
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
+    <main className="pltq-quiz pltq-result mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
+      <CustomCss site={siteCss} quiz={branding.customCss} />
       {autoprint && <AutoPrint />}
+      <Banner banner={branding.banner} />
       <header className="flex flex-col gap-1">
         <p className="text-sm font-medium text-muted">{result.quiz.title}</p>
-        <h1 className="text-3xl font-semibold">Quiz result</h1>
+        <h1 className="pltq-title text-3xl font-semibold">Quiz result</h1>
         <p className="text-sm text-muted">Taken {taken}</p>
       </header>
 
@@ -48,7 +56,7 @@ export default async function SharedResultPage({ params, searchParams }: PagePro
       <div className="no-print flex flex-wrap items-center gap-3">
         <PrintButton />
         {result.quiz.deliveryMode === "hosted" && (
-          <Link href={`/quizzes/${result.quiz.slug}`} className="rounded-md border border-border bg-surface px-4 py-2 font-medium hover:bg-border/40">
+          <Link href={`/quizzes/${result.quiz.slug}`} className="pltq-button rounded-md border border-border bg-surface px-4 py-2 font-medium hover:bg-border/40">
             Take this quiz
           </Link>
         )}

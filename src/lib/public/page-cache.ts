@@ -1,5 +1,6 @@
 import "server-only";
 import { unstable_cache, updateTag } from "next/cache";
+import { getSiteCss } from "@/lib/content/settings";
 import { db } from "@/lib/db/client";
 import { getPublishedQuizPage, listPublishedQuizzes } from "./structure";
 
@@ -22,6 +23,12 @@ export const getCachedPublishedQuizzes = unstable_cache(
   ["public-hosted-quiz-list"],
   { tags: [QUIZ_PAGES_TAG], revalidate: 300 },
 );
+
+/** Site-wide CSS for respondent pages (expired with the pages when Settings change). */
+export const getCachedSiteCss = unstable_cache(async () => getSiteCss(db), ["site-css"], {
+  tags: [QUIZ_PAGES_TAG],
+  revalidate: 300,
+});
 
 /** Call from server actions after a change to a quiz's title, slug, intro, status or delivery. */
 export function expireQuizPages() {
