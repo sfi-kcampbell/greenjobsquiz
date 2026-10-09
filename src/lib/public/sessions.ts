@@ -4,6 +4,7 @@
  * so it can be tested against Postgres directly.
  */
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { CODE_MESSAGES, resolveCode } from "@/lib/content/quiz-codes";
 import { loadScoringBundle } from "@/lib/content/scoring-model";
 import type { Database, Executor, Tx } from "@/lib/db/create";
 import { quizSessions, quizzes, results, submissionAnswers, submissions } from "@/lib/db/schema";
@@ -133,6 +134,8 @@ export async function saveAnswers(
     clientRevision?: number;
     currentIndex?: number;
     ipHash?: string | null;
+    /** A quiz code; only used when this save starts a new attempt. */
+    code?: string | null;
   },
 ): Promise<SaveResult> {
   for (const e of input.entries) validateAnswer(quiz, e.questionId, e.answerIds);
@@ -151,7 +154,8 @@ export async function saveAnswers(
   // A client with no session yet holds revision 0; a write that creates the attempt isn't stale.
   let created = false;
   if (!row || row.status === "abandoned") {
-    row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null);
+    const codeId = await codeForNewAttempt(db, quiz, input.code);
+    row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null, codeId);
     created = true;
   }
 
@@ -187,11 +191,39 @@ export async function saveAnswers(
   };
 }
 
+/**
+ * The quiz code for a new attempt: null when none is given (allowed unless
+ * the quiz requires one); refused if the code is unknown, closed or not open yet.
+ */
+async function codeForNewAttempt(db: Executor, quiz: PublicQuiz, code: string | null | undefined): Promise<number | null> {
+  if (!code) {
+    if (quiz.settings.requireCode) {
+      throw new PublicError(403, "quiz_code_required", "This quiz needs a quiz code to start.");
+    }
+    return null;
+  }
+  const resolved = await resolveCode(db, quiz.id, code);
+  if (!resolved.ok) {
+    throw new PublicError(422, "quiz_code_invalid", CODE_MESSAGES[resolved.reason], {
+      reason: resolved.reason,
+      ...(resolved.opensAt ? { opensAt: resolved.opensAt.toISOString() } : {}),
+    });
+  }
+  return resolved.codeId;
+}
+
 /** Inserts attempt `attemptNo`; if a concurrent request already did, returns that row. */
-async function createAttempt(db: Executor, quizId: number, tokenHash: string, attemptNo: number, ipHash: string | null): Promise<SessionRow> {
+async function createAttempt(
+  db: Executor,
+  quizId: number,
+  tokenHash: string,
+  attemptNo: number,
+  ipHash: string | null,
+  codeId: number | null = null,
+): Promise<SessionRow> {
   const [row] = await db
     .insert(quizSessions)
-    .values({ quizId, tokenHash, attemptNo, ipHash, expiresAt: expiry() })
+    .values({ quizId, tokenHash, attemptNo, ipHash, codeId, expiresAt: expiry() })
     .onConflictDoNothing()
     .returning();
   if (row) return row;
@@ -209,6 +241,7 @@ export async function restart(
   quiz: PublicQuiz,
   tokenHash: string | null,
   ipHash?: string | null,
+  code?: string | null,
 ): Promise<SessionView> {
   if (!tokenHash) return viewOf(quiz, null, null);
   const latest = await latestSession(db, quiz.id, tokenHash);
@@ -231,11 +264,13 @@ export async function restart(
     if (done) throw new PublicError(403, "quiz_retake_not_allowed", "This quiz can only be taken once.");
   }
 
+  // A retake keeps the code it started with unless a new one is given.
+  const codeId = code ? await codeForNewAttempt(db, quiz, code) : (latest.codeId ?? (await codeForNewAttempt(db, quiz, null)));
   const row = await db.transaction(async (tx) => {
     if (latest.status === "in_progress") {
       await tx.update(quizSessions).set({ status: "abandoned" }).where(eq(quizSessions.id, latest.id));
     }
-    return createAttempt(tx, quiz.id, tokenHash, latest.attemptNo + 1, ipHash ?? null);
+    return createAttempt(tx, quiz.id, tokenHash, latest.attemptNo + 1, ipHash ?? null, codeId);
   });
   return viewOf(quiz, row, null);
 }
@@ -345,6 +380,7 @@ async function storeSubmission(
     .values({
       quizId: quiz.id,
       sessionId: session.id,
+      codeId: session.codeId,
       tokenHash: session.tokenHash,
       attemptNo: session.attemptNo,
       resultId: match?.resultId ?? null,
@@ -415,7 +451,7 @@ type StoredScores = {
 };
 type StoredRanked = { resultId: number; raw: number; title: string }[];
 
-const shareOfMax = (raw: number, max: number) =>
+export const shareOfMax = (raw: number, max: number) =>
   max > 0 ? Math.round(100 * Math.max(0, Math.min(1, raw / max))) : 0;
 
 /** The token is the credential; unknown or revoked tokens look the same. */

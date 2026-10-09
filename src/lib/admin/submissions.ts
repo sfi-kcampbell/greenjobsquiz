@@ -6,7 +6,7 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor } from "@/lib/db/create";
-import { answers as answersTable, questions, quizSessions, quizzes, results, submissions } from "@/lib/db/schema";
+import { answers as answersTable, questions, quizCodes, quizSessions, quizzes, results, submissions } from "@/lib/db/schema";
 import { hashToken, shareTokenFor } from "@/lib/public/tokens";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { toPercentage } from "@/lib/scoring/engine";
@@ -29,6 +29,7 @@ const optionalId = z.coerce.number().int().positive().max(2_147_483_647).optiona
 export const submissionListQuery = z.object({
   quiz: optionalId,
   response: optionalId,
+  code: optionalId,
   from: isoDay,
   to: isoDay,
   q: z
@@ -93,6 +94,7 @@ export type SubmissionRow = {
   questionTotal: number;
   durationSeconds: number | null;
   suspect: boolean;
+  code: string | null;
 };
 
 /** The WHERE clause for a list query (shared with the CSV export). */
@@ -108,6 +110,15 @@ export async function filters(db: Executor, query: SubmissionListQuery): Promise
         .where(and(eq(results.id, query.response), eq(results.quizId, query.quiz)))
         .limit(1);
       if (owned) conditions.push(eq(submissions.resultId, query.response));
+    }
+    if (query.code) {
+      // Likewise, only a code from the chosen quiz.
+      const [owned] = await db
+        .select({ id: quizCodes.id })
+        .from(quizCodes)
+        .where(and(eq(quizCodes.id, query.code), eq(quizCodes.quizId, query.quiz)))
+        .limit(1);
+      if (owned) conditions.push(eq(submissions.codeId, query.code));
     }
   }
   if (query.from) conditions.push(gte(submissions.createdAt, new Date(`${query.from}T00:00:00Z`)));
@@ -151,10 +162,12 @@ export async function listSubmissions(db: Executor, query: SubmissionListQuery) 
       questionTotal: sql<number>`coalesce(${questionTotals.n}, 0)::int`,
       durationSeconds: submissions.durationSeconds,
       suspect: submissions.suspect,
+      code: quizCodes.code,
     })
     .from(submissions)
     .innerJoin(quizzes, eq(quizzes.id, submissions.quizId))
     .leftJoin(questionTotals, eq(questionTotals.quizId, submissions.quizId))
+    .leftJoin(quizCodes, eq(quizCodes.id, submissions.codeId))
     .where(where)
     .orderBy(...orderFor(query))
     .limit(query.per)
@@ -182,7 +195,12 @@ export async function listFilterOptions(db: Executor, quizId?: number) {
         .where(eq(results.quizId, quizId))
         .orderBy(asc(results.position), asc(results.id))
     : [];
-  return { quizOptions, responseOptions };
+  const codeOptions = quizId
+    ? (await db.select({ id: quizCodes.id, code: quizCodes.code, label: quizCodes.label }).from(quizCodes).where(eq(quizCodes.quizId, quizId)).orderBy(asc(quizCodes.code))).map(
+        (c) => ({ id: c.id, title: c.label ? `${c.code} (${c.label})` : c.code }),
+      )
+    : [];
+  return { quizOptions, responseOptions, codeOptions };
 }
 
 /* -------------------------------- Detail --------------------------------- */

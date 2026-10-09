@@ -26,6 +26,8 @@ import {
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { recordAudit } from "@/lib/audit";
+import { codeDatesInput, codeInput } from "@/lib/content/quiz-code-rules";
+import { createCode, resetReportLink, setCodeArchived, setRequireCode, updateCode } from "@/lib/content/quiz-codes";
 import { duplicateQuiz } from "@/lib/content/quiz-file";
 import { db } from "@/lib/db/client";
 import { quizzes } from "@/lib/db/schema";
@@ -224,4 +226,85 @@ export async function duplicateQuizAction(quizId: number): Promise<FormState> {
   }
   revalidatePath("/admin/quizzes");
   redirect(`/admin/quizzes/${newId}`);
+}
+
+/* ------------------------------- Quiz codes ------------------------------ */
+
+export async function setRequireCodeAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  const required = formData.get("requireCode") === "on";
+  await setRequireCode(db, id, required);
+  await recordAudit(db, staff, {
+    scope: "quiz",
+    action: "quiz.require_code",
+    quizId: id,
+    summary: required ? "Required a quiz code to start" : "Stopped requiring a quiz code",
+  });
+  expireQuizPages();
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: required ? "A code is now required to start." : "Anyone can start without a code." };
+}
+
+export async function createCodeAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    const input = codeInput.parse({
+      code: String(formData.get("code") ?? ""),
+      label: String(formData.get("label") ?? ""),
+      opensOn: String(formData.get("opensOn") ?? ""),
+      closesOn: String(formData.get("closesOn") ?? ""),
+    });
+    await createCode(db, id, input, staff.email);
+    await recordAudit(db, staff, { scope: "quiz", action: "code.create", quizId: id, summary: `Created quiz code ${input.code}${input.label ? ` (${input.label})` : ""}` });
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "Code created." };
+}
+
+export async function updateCodeAction(quizId: number, codeId: number, _prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    const input = codeDatesInput.parse({
+      label: String(formData.get("label") ?? ""),
+      opensOn: String(formData.get("opensOn") ?? ""),
+      closesOn: String(formData.get("closesOn") ?? ""),
+    });
+    const code = await updateCode(db, id, idSchema.parse(codeId), input);
+    await recordAudit(db, staff, { scope: "quiz", action: "code.update", quizId: id, summary: `Changed quiz code ${code}'s label or dates` });
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "Saved." };
+}
+
+export async function archiveCodeAction(quizId: number, codeId: number, archived: boolean): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    const code = await setCodeArchived(db, id, idSchema.parse(codeId), archived);
+    await recordAudit(db, staff, { scope: "quiz", action: archived ? "code.archive" : "code.restore", quizId: id, summary: `${archived ? "Archived" : "Restored"} quiz code ${code}` });
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true };
+}
+
+export async function resetReportLinkAction(quizId: number, codeId: number): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  try {
+    const code = await resetReportLink(db, id, idSchema.parse(codeId));
+    await recordAudit(db, staff, { scope: "quiz", action: "code.report_reset", quizId: id, summary: `Made a new teacher link for quiz code ${code} (the old one stopped working)` });
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: "New teacher link made. The old link no longer works." };
 }

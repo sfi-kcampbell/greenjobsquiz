@@ -36,6 +36,13 @@
       "when": 1791491262397,
       "tag": "0004_audit_events",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791497874181,
+      "tag": "0005_quiz_codes",
+      "breakpoints": true
     }
   ]
 }

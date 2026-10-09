@@ -43,6 +43,11 @@ export function shareTokenFor(sessionTokenHash: string, submissionId: number): s
   return createHmac("sha256", pepper()).update(`share:${sessionTokenHash}:${submissionId}`).digest("hex").slice(0, 32);
 }
 
+/** A quiz code's teacher-report token (128 bits). A new salt gives a new link. */
+export function reportTokenFor(codeId: number, salt: string): string {
+  return createHmac("sha256", pepper()).update(`report:${codeId}:${salt}`).digest("hex").slice(0, 32);
+}
+
 export function isToken(value: unknown): value is string {
   return typeof value === "string" && TOKEN_PATTERN.test(value);
 }

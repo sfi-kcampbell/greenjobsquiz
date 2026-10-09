@@ -105,7 +105,7 @@ export async function checkWriteOrigin(req: NextRequest, identity: Identity) {
 
 /* -------------------------------- Limits --------------------------------- */
 
-const LIMITS = { submit: 10, restart: 20, answer: 300 } as const;
+const LIMITS = { submit: 10, restart: 20, answer: 300, code: 60 } as const;
 
 /** Per IP and per respondent token, per hour. */
 export async function rateLimit(action: keyof typeof LIMITS, tokenHash: string | null) {

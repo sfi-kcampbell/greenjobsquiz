@@ -14,10 +14,12 @@ export function Filters({
   values,
   quizOptions,
   responseOptions,
+  codeOptions,
 }: {
-  values: { quiz?: number; response?: number; from?: string; to?: string; q?: string; sort: string; dir: string; per: number };
+  values: { quiz?: number; response?: number; code?: number; from?: string; to?: string; q?: string; sort: string; dir: string; per: number };
   quizOptions: Option[];
   responseOptions: Option[];
+  codeOptions: Option[];
 }) {
   const form = useRef<HTMLFormElement>(null);
   const field = "rounded-md border border-border bg-surface px-2 py-1.5";
@@ -43,6 +45,8 @@ export function Filters({
           onChange={() => {
             const response = form.current?.elements.namedItem("response");
             if (response instanceof HTMLSelectElement) response.value = "";
+            const code = form.current?.elements.namedItem("code");
+            if (code instanceof HTMLSelectElement) code.value = "";
             form.current?.requestSubmit();
           }}
         >
@@ -62,6 +66,21 @@ export function Filters({
           <select id="f-response" name="response" defaultValue={values.response ?? ""} className={field}>
             <option value="">Any response</option>
             {responseOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {values.quiz && codeOptions.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor="f-code" className="font-medium">
+            Quiz code
+          </label>
+          <select id="f-code" name="code" defaultValue={values.code ?? ""} className={field}>
+            <option value="">Any code</option>
+            {codeOptions.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.title}
               </option>

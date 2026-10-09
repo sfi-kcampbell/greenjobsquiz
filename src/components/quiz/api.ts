@@ -110,21 +110,29 @@ async function call<T>(path: string, init: RequestInit = {}, identity?: Identity
   return data as T;
 }
 
-export function quizApi(quizId: number, identity: Identity | null = null) {
+export type CodeCheck = { valid: true; code: string } | { valid: false; reason: string; message: string; opensAt: string | null };
+
+/** `getCode`: the quiz code for this visit, sent when an attempt starts. */
+export function quizApi(quizId: number, identity: Identity | null = null, getCode: () => string | null = () => null) {
   const base = `/quizzes/${quizId}`;
   const send = <T,>(path: string, init: RequestInit = {}) => call<T>(path, init, identity);
+  const withCode = <B extends object>(body: B) => {
+    const code = getCode();
+    return code ? { ...body, code } : body;
+  };
   return {
     // The structure may come from the HTTP cache (ETag); nothing else may. It's the same for everyone.
     structure: () => call<{ quiz: PublicQuiz }>(base, { cache: "default" }).then((r) => r.quiz),
     session: () => send<SessionResponse>(`${base}/session`),
     saveAnswer: (body: { questionId: number; answerIds: number[]; clientRevision?: number; currentIndex?: number }) =>
-      send<SaveResponse>(`${base}/session/answer`, { method: "PUT", body: JSON.stringify(body) }).then((res) => {
+      send<SaveResponse>(`${base}/session/answer`, { method: "PUT", body: JSON.stringify(withCode(body)) }).then((res) => {
         // First answer from an embed: keep the new key for every later call.
         if (res.sessionKey && identity && !identity.get()) identity.set(res.sessionKey);
         return res;
       }),
     submit: () => send<SubmitResponse>(`${base}/submit`, { method: "POST", body: "{}" }),
-    restart: () => send<Omit<SessionResponse, "result">>(`${base}/session/restart`, { method: "POST", body: "{}" }),
+    restart: () => send<Omit<SessionResponse, "result">>(`${base}/session/restart`, { method: "POST", body: JSON.stringify(withCode({})) }),
+    checkCode: (code: string) => send<CodeCheck>(`${base}/codes/${encodeURIComponent(code)}`),
     attempts: () => send<{ attempts: Attempt[] }>(`${base}/attempts`).then((r) => r.attempts),
     result: (token: string) => send<ResultLinks & { result: ResultPayload }>(`/results/${encodeURIComponent(token)}`),
   };
