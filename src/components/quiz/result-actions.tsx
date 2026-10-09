@@ -48,6 +48,9 @@ export function ResultActions({ shareToken }: { shareToken: string }) {
         <a href={`/quiz-result/${shareToken}`} target="_blank" rel="noopener" className={`${button} inline-block`}>
           Printable page<span className="sr-only"> (opens in a new tab)</span>
         </a>
+        <a href={`/quiz-result/${shareToken}/card?download=1`} download className={`${button} inline-block`}>
+          Download image
+        </a>
         <p role="status" className="text-sm text-brand">
           {status}
         </p>

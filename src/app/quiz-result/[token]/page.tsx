@@ -8,7 +8,9 @@ import { getSiteCss } from "@/lib/content/settings";
 import { db } from "@/lib/db/client";
 import { getResultByShareToken } from "@/lib/public/sessions";
 import { getQuizBranding } from "@/lib/public/structure";
+import { CARD_SIZE, cardContent, shareMetadataText } from "@/lib/public/share-card";
 import { isToken } from "@/lib/public/tokens";
+import { requestOrigin } from "@/lib/app-url";
 import { AutoPrint } from "./auto-print";
 import { PrintButton } from "./print-button";
 
@@ -26,10 +28,16 @@ async function load(token: string) {
 }
 
 export async function generateMetadata({ params }: PageProps<"/quiz-result/[token]">): Promise<Metadata> {
-  const result = await load((await params).token);
+  const token = (await params).token;
+  const result = await load(token);
+  // Link previews (social media, iMessage, Slack, Teams) show the share card.
+  const text = shareMetadataText(result);
+  const image = { url: `${await requestOrigin()}/quiz-result/${token}/card`, ...CARD_SIZE, alt: cardContent(result).alt };
   return {
     title: `${result.match?.title ?? "Result"} · ${result.quiz.title}`,
     robots: { index: false, follow: false },
+    openGraph: { type: "website", title: text.title, description: text.description, images: [image] },
+    twitter: { card: "summary_large_image", title: text.title, description: text.description, images: [image] },
   };
 }
 
@@ -55,6 +63,13 @@ export default async function SharedResultPage({ params, searchParams }: PagePro
 
       <div className="no-print flex flex-wrap items-center gap-3">
         <PrintButton />
+        <a
+          href={`/quiz-result/${(await params).token}/card?download=1`}
+          download
+          className="pltq-button rounded-md border border-border bg-surface px-4 py-2 font-medium hover:bg-border/40"
+        >
+          Download image
+        </a>
         {result.quiz.deliveryMode === "hosted" && (
           <Link href={`/quizzes/${result.quiz.slug}`} className="pltq-button rounded-md border border-border bg-surface px-4 py-2 font-medium hover:bg-border/40">
             Take this quiz

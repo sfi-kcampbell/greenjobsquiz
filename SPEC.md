@@ -663,6 +663,10 @@ allowed origins in Settings, and the default allows all.
   `?autoprint=1`. It sends `no-store` and is noindexed through both a header and a meta tag.
 - **Share token:** 128 random bits, returned once, stored only as an HMAC, and revocable. Submission
   IDs never appear in public URLs.
+- **Share card:** `/quiz-result/{token}/card`, a 1200×630 PNG (`next/og` `ImageResponse`, Geist from
+  `assets/fonts`) with the banner (PNG/JPEG), the best match, its percentage (not for fallbacks) and the
+  top three categories. It's the share page's `og:image` and `twitter:image` (`summary_large_image`), is
+  offered as **Download image**, and is `shareImageUrl` in the API. Same headers and revocation as the share page.
 - **PDF:** no server-side PDF library. The browser's "Save as PDF" on the print route is the PDF
   feature. A v1.1 idea is "Email me my results" through Resend.
 
