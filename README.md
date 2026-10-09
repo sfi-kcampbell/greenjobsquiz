@@ -23,6 +23,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Images, banner and custom CSS**: an **Image** button in every rich-text editor (intro, question help, answer details, response descriptions), a **Banner** per quiz, and custom CSS site-wide (Settings, Super Admin) and per quiz (quiz settings), with the quiz's CSS overriding the site's. See "Images and custom CSS" below.
 - **Copy, export, import and activity**: **Duplicate** a quiz as a draft (from the quiz list or its settings), **Export** a quiz with its images as a `.quiz.json` file and **Import** it here or on another site (always as a new draft), and an **Activity** log of who changed what. See "Copying quizzes and the activity log" below.
 - **Quiz codes**: codes for mailers and classes with short links (`/q/CODE`), opening and closing dates, an option to require a code, starts and finishes per code, a Code filter and CSV column in Submissions, a private anonymous teacher summary, a QR code and a printable flyer. See "Quiz codes" below.
+- **Share cards**: shared result links show a branded image card (best match, % match, top three categories) in link previews on social media, iMessage, Slack and Teams, and **Download image** saves it. The API returns its address as `shareImageUrl`.
 
 See the build order in SPEC.md for what comes next.
 
@@ -192,3 +193,13 @@ Quiz settings → **Quiz codes**:
 - **Teacher link:** a private page (`/quiz-codes/report/…`) with counts, the share of each best match, and the average category profile, once 5 people have finished (so no one can be singled out). No names, emails or individual answers. Never cached or indexed. **New teacher link** stops the old one working.
 - **QR code** (SVG download) and **Flyer**: a one-page printable flyer with the title, a short pitch (editable before printing), a large QR code and the short link. Print it or save it as a PDF from the browser.
 - Code checks are rate-limited, so codes can't be guessed by trying many.
+
+## Share cards
+
+Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`, made on request with Next's `ImageResponse`:
+
+- The card shows the quiz banner (PNG or JPEG; otherwise a green band with the quiz title), the best match and its percentage, the top three categories with their colours, and the site's name and address. Never emails, answers or anything else about the person.
+- The share page's Open Graph and Twitter tags point at it, so pasted links unfurl with the card. **Download image** on the result screen and the printable page saves it (`{quiz}-result.png`).
+- Like the share page, the card is never cached or indexed, and turning off a share link turns off its card too.
+- Headless front ends get its address as `shareImageUrl` in submit and result responses.
+- The card uses Geist (SIL Open Font License; `assets/fonts`).
