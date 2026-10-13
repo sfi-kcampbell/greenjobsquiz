@@ -26,6 +26,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           { href: "/admin/settings", label: "Settings" },
         ]
       : []),
+    { href: "/admin/help", label: "Help" },
   ];
 
   async function signOutAction() {
