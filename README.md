@@ -24,6 +24,8 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Copy, export, import and activity**: **Duplicate** a quiz as a draft (from the quiz list or its settings), **Export** a quiz with its images as a `.quiz.json` file and **Import** it here or on another site (always as a new draft), and an **Activity** log of who changed what. See "Copying quizzes and the activity log" below.
 - **Quiz codes**: codes for mailers and classes with short links (`/q/CODE`), opening and closing dates, an option to require a code, starts and finishes per code, a Code filter and CSV column in Submissions, a private anonymous teacher summary, a QR code and a printable flyer. See "Quiz codes" below.
 
+- **Help**: an FAQ with step-by-step how-tos for staff at `/admin/help` (linked in the admin menu and on the Dashboard). Super Admin-only topics are hidden from Admins. The content lives in `src/app/admin/help/faq.tsx`; update it when a button or section name changes.
+
 See the build order in SPEC.md for what comes next.
 
 ## Roles

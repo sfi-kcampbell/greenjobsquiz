@@ -27,6 +27,12 @@ export default async function AdminDashboard() {
             <p className="mt-1 text-sm text-muted">Invite and manage Admins.</p>
           </li>
         )}
+        <li className="rounded-lg border border-border bg-surface p-4">
+          <Link href="/admin/help" className="font-medium text-brand">
+            Help
+          </Link>
+          <p className="mt-1 text-sm text-muted">FAQ and how-tos for building and sharing quizzes.</p>
+        </li>
       </ul>
     </div>
   );
