@@ -20,7 +20,13 @@ export function ScoringForm({
   const [state, action, pending] = useActionState<FormState, FormData>(updateScoringAction.bind(null, quizId), {});
 
   return (
-    <form action={action} className="flex flex-col gap-4 text-sm">
+    // React resets the form after the action, and a <select> keeps the default it mounted with, so remount on
+    // the saved values; otherwise the dropdowns snap back to what they showed when the page loaded.
+    <form
+      key={`${runnersUpCount}-${normalizePerCategory}-${defaultResultId ?? ""}`}
+      action={action}
+      className="flex flex-col gap-4 text-sm"
+    >
       <div className="flex flex-col gap-1">
         <label htmlFor="runnersUpCount" className="font-medium">
           Runners-up shown with the result
