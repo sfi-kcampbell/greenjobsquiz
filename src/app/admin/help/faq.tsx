@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
  * Help content for staff. Button and section names here must match the admin
  * screens; update this file when a label changes.
  */
-export type FaqItem = { id: string; question: string; answer: ReactNode; superAdminOnly?: boolean };
-export type FaqSection = { id: string; title: string; items: FaqItem[] };
+export type FaqItem = { id: string; question: string; answer: ReactNode };
+/** Super Admin-only sections are hidden from Admins. */
+export type FaqSection = { id: string; title: string; superAdminOnly?: boolean; items: FaqItem[] };
 
 const Steps = ({ children }: { children: ReactNode }) => <ol className="list-decimal space-y-1 pl-5">{children}</ol>;
 const Ui = ({ children }: { children: ReactNode }) => <strong className="font-semibold">{children}</strong>;
@@ -231,8 +232,8 @@ export const FAQ: FaqSection[] = [
             </li>
             <li>Paste it into the other page&apos;s HTML. The frame resizes itself to fit the quiz.</li>
             <li>
-              If embedding is limited to certain sites, a Super Admin needs to add that site under{" "}
-              <Ui>Settings → Sites allowed to embed quizzes</Ui>.
+              If embedding is limited to certain sites, ask a Super Admin to add that site to the list of sites
+              allowed to embed quizzes.
             </li>
           </Steps>
         ),
@@ -320,8 +321,8 @@ export const FAQ: FaqSection[] = [
         answer: (
           <>
             <p>
-              Use <Ui>Settings → Quiz CSS</Ui> for one quiz, or the site-wide CSS on the main <Ui>Settings</Ui> page
-              (Super Admins) for every quiz. The quiz&apos;s CSS wins over the site-wide CSS.
+              Use <Ui>Settings → Quiz CSS</Ui> for one quiz. A Super Admin can also set site-wide CSS for every
+              quiz; the quiz&apos;s CSS wins over it.
             </p>
             <p>
               <Ui>Add element</Ui> inserts a ready-made rule for parts of the quiz such as answers, buttons or the
@@ -386,13 +387,43 @@ export const FAQ: FaqSection[] = [
     ],
   },
   {
-    id: "results",
-    title: "Results and data",
+    id: "sign-in",
+    title: "Sign-in and roles",
+    items: [
+      {
+        id: "roles",
+        question: "What can Admins and Super Admins do?",
+        answer: (
+          <p>
+            <Ui>Admins</Ui> create and edit quizzes and see quiz activity. <Ui>Super Admins</Ui> can also see
+            submissions, manage staff, and change site settings such as site-wide CSS and which sites may embed
+            quizzes.
+          </p>
+        ),
+      },
+      {
+        id: "no-email",
+        question: "I'm not getting the sign-in email. What now?",
+        answer: (
+          <>
+            <p>Check your spam folder and that you&apos;re using the exact email you were invited with.</p>
+            <p>
+              While PIN sign-in is turned on, a Super Admin can give you a PIN. Use <Ui>Sign in with PIN</Ui> on the
+              sign-in page with your email and that PIN.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+  {
+    id: "super-admin",
+    title: "Super Admin",
+    superAdminOnly: true,
     items: [
       {
         id: "view-submissions",
         question: "Where do I see who took a quiz?",
-        superAdminOnly: true,
         answer: (
           <p>
             Open <Ui>Submissions</Ui>. Filter by quiz, matched response, code, date or search text, and click a row
@@ -403,7 +434,6 @@ export const FAQ: FaqSection[] = [
       {
         id: "export-csv",
         question: "How do I download results to a spreadsheet?",
-        superAdminOnly: true,
         answer: (
           <>
             <p>
@@ -424,25 +454,17 @@ export const FAQ: FaqSection[] = [
       {
         id: "delete-submission",
         question: "How do I remove someone's submission?",
-        superAdminOnly: true,
         answer: (
           <p>
-            In <Ui>Submissions</Ui>, tick it and click <Ui>Delete selected</Ui>, or open it and delete it from its page. That person can then
-            start the quiz fresh. To only stop a shared result link working, use <Ui>Turn off share link</Ui> on the
-            submission&apos;s page.
+            In <Ui>Submissions</Ui>, tick it and click <Ui>Delete selected</Ui>, or open it and delete it from its
+            page. That person can then start the quiz fresh. To only stop a shared result link working, use{" "}
+            <Ui>Turn off share link</Ui> on the submission&apos;s page.
           </p>
         ),
       },
-    ],
-  },
-  {
-    id: "staff",
-    title: "Staff and sign-in",
-    items: [
       {
         id: "invite",
-        question: "How do I add another Admin?",
-        superAdminOnly: true,
+        question: "How do I add or remove an Admin?",
         answer: (
           <p>
             Go to <Ui>Staff</Ui>, enter their email and click <Ui>Invite Admin</Ui>. They can then sign in with that
@@ -452,26 +474,38 @@ export const FAQ: FaqSection[] = [
       },
       {
         id: "pin",
-        question: "Someone isn't getting the sign-in email. What now?",
+        question: "How do I give an Admin a sign-in PIN?",
         answer: (
           <>
-            <p>Check their spam folder and that they&apos;re using the exact email they were invited with.</p>
             <p>
-              While PIN sign-in is turned on, a Super Admin can click <Ui>Create PIN</Ui> next to them on{" "}
-              <Ui>Staff</Ui> and pass the PIN on. They then use <Ui>Sign in with PIN</Ui> on the sign-in page.
-              The PIN is only shown once; <Ui>Reset PIN</Ui> makes a new one.
+              On <Ui>Staff</Ui>, click <Ui>Create PIN</Ui> next to the Admin and pass the PIN on. It&apos;s only shown
+              once; <Ui>Reset PIN</Ui> makes a new one and signs them out everywhere.
+            </p>
+            <p>
+              Before launch, click <Ui>Revoke all PINs</Ui> so everyone signs in by email.
             </p>
           </>
         ),
       },
       {
-        id: "roles",
-        question: "What can Admins and Super Admins do?",
+        id: "embed-sites",
+        question: "How do I control which sites can embed quizzes?",
         answer: (
           <p>
-            <Ui>Admins</Ui> create and edit quizzes and see quiz activity. <Ui>Super Admins</Ui> can also see
-            submissions, manage staff, and change site settings such as site-wide CSS and which sites may embed
-            quizzes.
+            On the main <Ui>Settings</Ui> page, under <Ui>Embedding and API access</Ui>, list the sites in{" "}
+            <Ui>Sites allowed to embed quizzes</Ui> (leave it empty to allow any site) and click <Ui>Save</Ui>.
+            Changes take up to a minute to apply. Sites that run their own front end go in{" "}
+            <Ui>Sites allowed to call the quiz API from the browser</Ui>.
+          </p>
+        ),
+      },
+      {
+        id: "site-css",
+        question: "How do I style every quiz at once?",
+        answer: (
+          <p>
+            On the main <Ui>Settings</Ui> page, add rules under <Ui>Site-wide CSS</Ui> and click{" "}
+            <Ui>Save site CSS</Ui>. A quiz&apos;s own Quiz CSS still wins over it.
           </p>
         ),
       },

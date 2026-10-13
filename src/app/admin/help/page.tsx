@@ -7,9 +7,7 @@ export const metadata: Metadata = { title: "Help" };
 export default async function HelpPage() {
   const staff = await requireStaff();
   const isSuper = staff.role === "super_admin";
-  const sections = FAQ.map((s) => ({ ...s, items: s.items.filter((i) => isSuper || !i.superAdminOnly) })).filter(
-    (s) => s.items.length > 0,
-  );
+  const sections = FAQ.filter((s) => isSuper || !s.superAdminOnly);
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,10 +32,15 @@ export default async function HelpPage() {
       </nav>
 
       {sections.map((s) => (
-        <section key={s.id} aria-labelledby={s.id} className="flex scroll-mt-4 flex-col gap-2">
+        <section
+          key={s.id}
+          aria-labelledby={s.id}
+          className={`flex scroll-mt-4 flex-col gap-2 ${s.superAdminOnly ? "mt-4 border-t border-border pt-6" : ""}`}
+        >
           <h2 id={s.id} className="font-semibold">
             {s.title}
           </h2>
+          {s.superAdminOnly && <p className="text-sm text-muted">Only Super Admins see this section.</p>}
           <div className="divide-y divide-border rounded-lg border border-border bg-surface">
             {s.items.map((item) => (
               <details key={item.id} id={item.id} className="scroll-mt-4 px-4 py-3">
