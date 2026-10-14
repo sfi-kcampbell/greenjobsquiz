@@ -25,6 +25,10 @@ export type Card = {
   helpHtml: string | null;
   helpOpen: boolean;
   type: "single" | "multi";
+  /** "pre" (before the quiz) and "post" (follow-up) aren't scored and have no weights. */
+  part: "pre" | "scored" | "post";
+  /** The part as last saved: cards are grouped by it, so editing the select doesn't move the card yet. */
+  savedPart: "pre" | "scored" | "post";
   required: boolean;
   splitMulti: boolean;
   minSelect: string;
@@ -57,6 +61,8 @@ export function cardFromServer(q: QuestionView, previous?: Card): Card {
     helpHtml: q.helpHtml,
     helpOpen: previous?.helpOpen ?? false,
     type: q.type,
+    part: q.part,
+    savedPart: q.part,
     required: q.required,
     splitMulti: q.splitMulti,
     minSelect: String(q.minSelect),
@@ -76,7 +82,7 @@ export function emptyAnswer(): AnswerRow {
   return { key: newKey("a"), id: null, label: "", bodyHtml: null, bodyOpen: false, cells: {} };
 }
 
-export function emptyCard(): Card {
+export function emptyCard(part: Card["part"] = "scored"): Card {
   return {
     key: newKey("q"),
     id: null,
@@ -84,6 +90,8 @@ export function emptyCard(): Card {
     helpHtml: null,
     helpOpen: false,
     type: "single",
+    part,
+    savedPart: part,
     required: true,
     splitMulti: false,
     minSelect: "1",
@@ -103,6 +111,7 @@ export function toInput(card: Card, categories: CategoryHeader[]) {
     title: card.title,
     helpHtml: card.helpHtml,
     type: card.type,
+    part: card.part,
     required: card.required,
     splitMulti: card.splitMulti,
     minSelect: card.minSelect,

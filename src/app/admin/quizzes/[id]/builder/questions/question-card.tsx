@@ -147,6 +147,22 @@ export function QuestionCard({ card, index, categories, open, onToggle, onPatch,
                 <option value="multi">Multiple choice</option>
               </select>
             </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor={id("part")} className="font-medium">
+                When it&apos;s asked
+              </label>
+              <select
+                id={id("part")}
+                value={card.part}
+                onChange={(e) => set("part", e.target.value as Card["part"])}
+                aria-describedby={card.part === "scored" ? undefined : id("part-hint")}
+                className="rounded-md border border-border bg-surface px-2 py-1.5"
+              >
+                <option value="pre">Before the quiz (not scored)</option>
+                <option value="scored">Scored question</option>
+                <option value="post">Follow-up after the result (not scored)</option>
+              </select>
+            </div>
             {card.type === "multi" && (
               <>
                 <NumberField
@@ -169,7 +185,7 @@ export function QuestionCard({ card, index, categories, open, onToggle, onPatch,
               <input type="checkbox" checked={card.required} onChange={(e) => set("required", e.target.checked)} />
               Required
             </label>
-            {card.type === "multi" && (
+            {card.type === "multi" && card.part === "scored" && (
               <label
                 className="flex items-center gap-2 py-1.5"
                 title="Divide each answer's weights by the number of answers picked, so picking more doesn't count more."
@@ -206,6 +222,13 @@ export function QuestionCard({ card, index, categories, open, onToggle, onPatch,
               </div>
             )}
           </div>
+
+          {card.part !== "scored" && (
+            <p id={id("part-hint")} className="rounded-md bg-background px-3 py-2 text-sm text-muted">
+              Not scored: answers are saved with the submission and don&apos;t affect the result.{" "}
+              {card.part === "pre" ? "Asked before the scored questions." : "Asked under the result, after the quiz."}
+            </p>
+          )}
 
           <AnswerMatrix card={card} categories={categories} number={number} onEdit={onEdit} onPatch={onPatch} setAnswer={setAnswer} patchAnswer={patchAnswer} />
 
@@ -283,7 +306,7 @@ function NumberField({
 
 function AnswerMatrix({
   card,
-  categories,
+  categories: allCategories,
   number,
   onEdit,
   onPatch,
@@ -300,7 +323,10 @@ function AnswerMatrix({
 }) {
   const sensors = useSortSensors();
   const dndId = useId();
-  const columnTotals = categories.map((c) => card.answers.reduce((sum, a) => sum + cellValue(a.cells[c.id]), 0));
+  // Only scored questions have weights.
+  const weighted = card.part === "scored";
+  const cats = weighted ? allCategories : [];
+  const columnTotals = cats.map((c) => card.answers.reduce((sum, a) => sum + cellValue(a.cells[c.id]), 0));
 
   function onDragStart() {
     // Close body drawers first: the extra row can't travel with its answer.
@@ -324,7 +350,7 @@ function AnswerMatrix({
         <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <table className="w-full text-sm">
             <caption className="sr-only">
-              Answers and category weights for question {number}
+              {weighted ? `Answers and category weights for question ${number}` : `Answers for question ${number}`}
             </caption>
             <thead className="sticky top-0 z-10 bg-surface text-muted">
               <tr className="border-b border-border">
@@ -334,10 +360,12 @@ function AnswerMatrix({
                 <th scope="col" className="sticky left-0 z-10 min-w-56 bg-surface px-2 py-2 text-left font-medium">
                   Answer
                 </th>
-                <CategoryHeaderCells categories={categories} />
-                <th scope="col" className="px-2 py-2 text-center font-medium">
-                  Total
-                </th>
+                <CategoryHeaderCells categories={cats} />
+                {weighted && (
+                  <th scope="col" className="px-2 py-2 text-center font-medium">
+                    Total
+                  </th>
+                )}
                 <th scope="col" className="w-8 px-1 py-2">
                   <span className="sr-only">Remove</span>
                 </th>
@@ -352,7 +380,8 @@ function AnswerMatrix({
                     row={row}
                     cardKey={card.key}
                     number={number}
-                    categories={categories}
+                    categories={cats}
+                    weighted={weighted}
                     labelError={card.errors[`answers.${row}.label`]}
                     onLabel={(label) => setAnswer(answer.key, (a) => ({ ...a, label }))}
                     onCell={(categoryId, text) =>
@@ -365,7 +394,7 @@ function AnswerMatrix({
                 ))}
               </tbody>
             </SortableContext>
-            {card.answers.length > 0 && (
+            {weighted && card.answers.length > 0 && (
               <tfoot className="border-t border-border bg-background/60 text-muted">
                 <tr>
                   <td />
@@ -373,7 +402,7 @@ function AnswerMatrix({
                     Column totals
                   </th>
                   {columnTotals.map((total, i) => (
-                    <td key={categories[i].id} className="px-1 py-2 text-center tabular-nums">
+                    <td key={cats[i].id} className="px-1 py-2 text-center tabular-nums">
                       {fmt(total)}
                     </td>
                   ))}
@@ -410,6 +439,7 @@ function AnswerRowView({
   cardKey,
   number,
   categories,
+  weighted,
   labelError,
   onLabel,
   onCell,
@@ -422,6 +452,7 @@ function AnswerRowView({
   cardKey: string;
   number: number;
   categories: CategoryHeader[];
+  weighted: boolean;
   labelError?: string;
   onLabel: (label: string) => void;
   onCell: (categoryId: number, text: string) => void;
@@ -498,6 +529,7 @@ function AnswerRowView({
             />
           </td>
         ))}
+        {weighted && (
         <td className="px-2 py-1.5 pt-2.5 text-center tabular-nums text-muted">
           {noEffect ? (
             <span className="text-xs text-danger" title="All weights are zero, so this answer doesn't affect the result.">
@@ -507,6 +539,7 @@ function AnswerRowView({
             fmt(total)
           )}
         </td>
+        )}
         <td className="px-1 py-1.5">
           <button
             type="button"
@@ -522,7 +555,7 @@ function AnswerRowView({
       {answer.bodyOpen && (
         <tr className="border-b border-border bg-background/40">
           <td />
-          <td colSpan={categories.length + 3} className="px-2 py-2">
+          <td colSpan={categories.length + (weighted ? 3 : 2)} className="px-2 py-2">
             <RichTextEditor
               id={`ans-body-${answer.key}`}
               label={`Details for ${label}`}

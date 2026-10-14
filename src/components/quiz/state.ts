@@ -28,11 +28,14 @@ export type QuizState = {
   fromReview: boolean;
   /** A restart request is in flight. */
   restarting: boolean;
+  /** Follow-up answers already sent for the shown result (questionId → answer ids). */
+  followUpSent: Answers;
 };
 
 export type QuizAction =
   | { type: "loaded"; quiz: PublicQuiz; session: SessionResponse; result: ResultPayload | null }
   | { type: "load_failed"; message: string }
+  | { type: "followup_sent"; answers: Answers }
   /** Back from the back/forward cache: the server's view, with queued picks already on top. */
   | { type: "refreshed"; session: SessionResponse; result: ResultPayload | null }
   | { type: "reload" }
@@ -65,6 +68,7 @@ export const initialState: QuizState = {
   saveError: null,
   fromReview: false,
   restarting: false,
+  followUpSent: {},
 };
 
 export const picked = (answers: Answers, questionId: number) => answers[String(questionId)] ?? [];
@@ -125,7 +129,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       const base = { ...initialState, quiz, revision: session.revision, answers: session.answers };
       if (!quiz.questions.length) return { ...base, phase: "error", error: "This quiz has no questions yet." };
       if (session.status === "completed" && result) {
-        return { ...base, phase: "result", result, shareToken: session.result?.shareToken ?? null };
+        return { ...base, phase: "result", result, shareToken: session.result?.shareToken ?? null, followUpSent: session.result?.followUp ?? {} };
       }
       if (session.status === "in_progress" && session.answeredCount > 0) {
         return { ...base, phase: "resume", index: resumeIndex(quiz, session.answers) };
@@ -143,6 +147,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
           phase: "result",
           result,
           shareToken: session.result?.shareToken ?? null,
+          followUpSent: session.result?.followUp ?? {},
           answers: session.answers,
           revision: session.revision,
           error: null,
@@ -192,7 +197,9 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
       return { ...state, phase: "submitting", error: null };
     }
     case "submitted":
-      return { ...state, phase: "result", result: action.result, shareToken: action.shareToken, error: null };
+      return { ...state, phase: "result", result: action.result, shareToken: action.shareToken, error: null, followUpSent: {} };
+    case "followup_sent":
+      return { ...state, followUpSent: action.answers };
     case "submit_failed": {
       const missing = action.missingQuestionIds?.[0];
       const missingIndex = missing === undefined ? -1 : (state.quiz?.questions.findIndex((q) => q.id === missing) ?? -1);

@@ -161,9 +161,14 @@ export const answerInput = z.object({
 });
 export type AnswerInput = z.infer<typeof answerInput>;
 
+/** When a question is asked. Only "scored" questions have weights and count towards the result. */
+export const QUESTION_PARTS = ["pre", "scored", "post"] as const;
+export type QuestionPart = (typeof QUESTION_PARTS)[number];
+
 export const questionInput = z
   .object({
     id: z.coerce.number().int().positive().nullable(),
+    part: z.enum(QUESTION_PARTS).default("scored"),
     title: z.string().trim().min(1, "Enter the question.").max(300, "Keep the question under 300 characters."),
     helpHtml: richText,
     type: z.enum(["single", "multi"]),
@@ -173,9 +178,9 @@ export const questionInput = z
     maxSelect: z.coerce.number().int(),
     answers: z.array(answerInput).max(MAX_ANSWERS, `A question can have at most ${MAX_ANSWERS} answers.`),
   })
-  .transform((q) =>
-    q.type === "single" ? { ...q, minSelect: 1, maxSelect: 1, splitMulti: false } : q,
-  )
+  .transform((q) => (q.type === "single" ? { ...q, minSelect: 1, maxSelect: 1, splitMulti: false } : q))
+  // Questions that aren't scored never carry weights.
+  .transform((q) => (q.part === "scored" ? q : { ...q, splitMulti: false, answers: q.answers.map((a) => ({ ...a, weights: {} as Record<string, number> })) }))
   .superRefine((q, ctx) => {
     const keys = new Set(q.answers.map((a) => a.key));
     if (keys.size !== q.answers.length) {

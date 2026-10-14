@@ -21,6 +21,8 @@ export type PublicQuestion = {
   minSelect: number;
   maxSelect: number;
   required: boolean;
+  /** "pre": asked before the scored questions (not scored); "scored"; "post": a follow-up under the result. */
+  part: "pre" | "scored" | "post";
   answers: PublicAnswer[];
 };
 export type PublicBanner = { url: string; alt: string; width: number; height: number };
@@ -46,7 +48,10 @@ export type PublicQuiz = {
   version: number;
   /** Same as `version` (kept for older clients). */
   structureVersion: number;
+  /** In the order asked: "before the quiz" questions, then the scored ones. */
   questions: PublicQuestion[];
+  /** Follow-up questions, shown under the result (never scored). */
+  followUp: PublicQuestion[];
 };
 
 /** Published quizzes (the API lists all; pages pass `hostedOnly` to skip headless ones). */
@@ -103,6 +108,20 @@ export async function getPublishedQuizPage(db: Executor, slug: string): Promise<
 
 type QuizRow = typeof quizzes.$inferSelect;
 
+function toPublicQuestion(q: VersionRow["content"]["questions"][number]): PublicQuestion {
+  return {
+    id: q.id,
+    title: q.title,
+    helpHtml: sanitizeRichText(q.helpHtml, PUBLIC),
+    type: q.type,
+    minSelect: q.minSelect,
+    maxSelect: q.maxSelect,
+    required: q.required,
+    part: q.part,
+    answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: sanitizeRichText(a.bodyHtml, PUBLIC) })),
+  };
+}
+
 /**
  * A version's content plus the quiz's live settings (slug, banner, layout,
  * respondent options). Explicit field picks: weights are dropped here and
@@ -127,16 +146,9 @@ async function publicFromVersion(db: Executor, quiz: QuizRow, version: VersionRo
     },
     version: version.number,
     structureVersion: version.number,
-    questions: c.questions.map((q) => ({
-      id: q.id,
-      title: q.title,
-      helpHtml: sanitizeRichText(q.helpHtml, PUBLIC),
-      type: q.type,
-      minSelect: q.minSelect,
-      maxSelect: q.maxSelect,
-      required: q.required,
-      answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: sanitizeRichText(a.bodyHtml, PUBLIC) })),
-    })),
+    // "Before" questions first (stable within each part), then scored; follow-ups apart.
+    questions: [...c.questions.filter((q) => q.part === "pre"), ...c.questions.filter((q) => q.part === "scored")].map(toPublicQuestion),
+    followUp: c.questions.filter((q) => q.part === "post").map(toPublicQuestion),
   };
 }
 

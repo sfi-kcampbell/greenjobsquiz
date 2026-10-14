@@ -59,6 +59,7 @@ Used by the hosted quiz pages, the embed and any headless app. Only **published*
 | POST | `/quizzes/{id}/session/answers` | Batch (`sendBeacon`); accepts `sessionKey` in the body |
 | POST | `/quizzes/{id}/session/restart` | New attempt; earlier ones are kept |
 | POST | `/quizzes/{id}/submit` | `{email?}`. Scores on the server and returns the result and share link |
+| POST | `/quizzes/{id}/follow-up` | `{answers: [{questionId, answerIds}]}`, after submitting. Saves the follow-up answers; sending again replaces them |
 | GET | `/results/{token}` | A shared result |
 | GET | `/quizzes/{id}/attempts` | The respondent's past attempts |
 
@@ -217,3 +218,15 @@ Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`
 - **Versions** (quiz settings): number, date, who, note, how many finished on each, **View** (read-only, compared with the draft) and **Restore to draft** (then publish to make it live). Restoring brings back deleted questions, answers and responses with their original ids, and archives rather than deletes anything with submissions.
 - **API:** `GET /api/v1/quizzes/{id}` serves the latest version (`quiz.version`); `?version=N` serves an older one, for attempts still on it. The session response includes `version`.
 - Quizzes published before versions existed get version 1 automatically the first time they're loaded.
+
+## Before-the-quiz and follow-up questions
+
+- **When it's asked:** each question is one of the following.
+  - **Before the quiz:** asked first, not scored. For example, grade or school.
+  - **Scored:** the usual kind.
+  - **Follow-up:** shown under the result, not scored. For example, "Was this useful?".
+- **Not scored:** these questions have no weights, and they never affect the result, Simulate or Health.
+- **In the API:** `quiz.questions` lists the "before" questions, then the scored ones, each with a `part`. `quiz.followUp` lists the follow-up questions. A headless app can ignore the follow-ups, or send them to `POST /quizzes/{id}/follow-up` after submitting. The session's `result.followUp` holds the answers already given.
+- **Storage:** the answers are stored with the submission (`submissions.extra_answers`, plus `submission_answers` rows).
+- **Admin views:** the submission page shows them in their own sections, and the CSV export has a **Part** column (long) or one column per question (wide).
+- **Embeds:** sending follow-ups posts a `quiz:followup` event to the host page.

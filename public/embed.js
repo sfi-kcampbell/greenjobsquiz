@@ -2,7 +2,7 @@
  * PLT Quiz embed helper. Add after the quiz <iframe>:
  *   <script src="https://YOUR-QUIZ-SITE/embed.js" async></script>
  * It sizes each quiz iframe to its content and re-dispatches the quiz's
- * events (quiz:answer, quiz:complete, quiz:restart) on the iframe element.
+ * events (quiz:answer, quiz:complete, quiz:restart, quiz:followup) on the iframe element.
  */
 (function () {
   "use strict";

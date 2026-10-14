@@ -32,7 +32,13 @@ export type SessionView = {
   answeredCount: number;
   total: number;
   /** Present when the latest attempt has been submitted. */
-  result: { shareToken: string; resultTitle: string | null; percent: number | null } | null;
+  result: {
+    shareToken: string;
+    resultTitle: string | null;
+    percent: number | null;
+    /** Follow-up answers already sent (questionId → answer ids); empty if none. */
+    followUp: Record<string, number[]>;
+  } | null;
   /** The published version this attempt is on (it finishes on the version it started). */
   version: number;
 };
@@ -76,6 +82,11 @@ function viewOf(quiz: PublicQuiz, row: SessionRow | null, submission: Awaited<Re
             shareToken: shareTokenFor(row.tokenHash, submission.id),
             resultTitle: submission.resultTitle,
             percent: submission.rawSimilarity === null ? null : toPercentage(submission.rawSimilarity),
+            followUp: Object.fromEntries(
+              ((submission.extraAnswers ?? []) as ExtraAnswer[])
+                .filter((q) => q.part === "post")
+                .map((q) => [String(q.questionId), q.answers.map((a) => a.answerId)]),
+            ),
           }
         : null,
     version: quiz.version,
@@ -340,7 +351,7 @@ export async function submit(
       throw new PublicError(422, "quiz_missing_answers", "Some required questions haven't been answered.", { questionIds: missing });
     }
 
-    const stored = await storeSubmission(tx, quiz, session, input);
+    const stored = await storeSubmission(tx, quiz, attemptQuiz, session, input);
     await tx
       .update(quizSessions)
       .set({ status: "completed", submissionId: stored.submissionId })
@@ -349,18 +360,59 @@ export async function submit(
   });
 }
 
+export type ExtraAnswer = {
+  questionId: number;
+  questionTitle: string;
+  part: "pre" | "post";
+  answers: { answerId: number; label: string }[];
+};
+
+/** Snapshots of answers to questions that aren't scored ("before the quiz" or follow-up). */
+function extraSnapshot(questions: PublicQuiz["questions"], answers: Record<string, number[]>): ExtraAnswer[] {
+  return questions
+    .filter((q) => answers[String(q.id)]?.length)
+    .map((q) => ({
+      questionId: q.id,
+      questionTitle: q.title,
+      part: q.part === "post" ? "post" : "pre",
+      answers: answers[String(q.id)].map((id) => ({ answerId: id, label: q.answers.find((a) => a.id === id)?.label ?? "" })),
+    }));
+}
+
+/** submission_answers rows for extra answers (so per-answer counts include them). */
+function extraRows(submissionId: number, quizId: number, extra: ExtraAnswer[], ordered: PublicQuiz["questions"]) {
+  return extra.flatMap((q) =>
+    q.answers.map((a) => ({
+      submissionId,
+      quizId,
+      questionId: q.questionId,
+      answerId: a.answerId,
+      questionTitle: q.questionTitle,
+      answerTitle: a.label,
+      position: Math.max(0, ordered.findIndex((x) => x.id === q.questionId)),
+    })),
+  );
+}
+
 async function storeSubmission(
   tx: Tx,
   quiz: PublicQuiz,
+  attemptQuiz: PublicQuiz,
   session: SessionRow,
   input: { email?: string | null; ipHash?: string | null; referrer?: string | null },
 ): Promise<{ shareToken: string; submissionId: number }> {
   // Scored with the version the attempt is on, never the unpublished draft.
   const version = session.versionId ? await getVersionById(tx, session.versionId) : await latestVersion(tx, quiz.id);
   const bundle = version ? bundleFromContent(version.content) : await loadScoringBundle(tx, quiz.id);
+  // Only scored questions count; "before the quiz" answers are kept separately below.
+  const scoredIds = new Set(bundle.model.questions.map((q) => q.id));
   const selections: Selection[] = Object.entries(session.answers)
-    .filter(([, ids]) => ids.length > 0)
+    .filter(([questionId, ids]) => ids.length > 0 && scoredIds.has(Number(questionId)))
     .map(([questionId, answerIds]) => ({ questionId: Number(questionId), answerIds }));
+  const extraAnswers = extraSnapshot(
+    attemptQuiz.questions.filter((q) => q.part === "pre"),
+    session.answers,
+  );
   const result = score(bundle.model, selections);
 
   const resultTitles = new Map(bundle.display.results.map((r) => [r.id, r.title]));
@@ -421,8 +473,9 @@ async function storeSubmission(
       scores: { status: result.status, isClose: result.isClose, isFallback: result.isFallback, categories: scores },
       ranked: result.ranked.map((r) => ({ ...r, title: resultTitles.get(r.resultId) ?? "" })),
       answers: answerSnapshot,
+      extraAnswers,
       email: input.email || null,
-      questionsAnswered: selections.length,
+      questionsAnswered: selections.length + extraAnswers.length,
       durationSeconds,
       engineVersion: result.engine,
       suspect: durationSeconds < SUSPECT_SECONDS,
@@ -445,6 +498,7 @@ async function storeSubmission(
       position: bundle.model.questions.findIndex((x) => x.id === q.questionId),
     })),
   );
+  rows.push(...extraRows(row.id, quiz.id, extraAnswers, attemptQuiz.questions));
   if (rows.length) await tx.insert(submissionAnswers).values(rows);
 
   return { shareToken, submissionId: row.id };
@@ -564,4 +618,52 @@ export async function listAttempts(db: Executor, quizId: number, tokenHash: stri
     percent: s.rawSimilarity === null ? null : toPercentage(s.rawSimilarity),
     shareToken: s.shareTokenHash ? shareTokenFor(tokenHash, s.id) : null,
   }));
+}
+
+/* -------------------------------- Follow-up ------------------------------- */
+
+/**
+ * Saves the follow-up answers (asked under the result, never scored) to the
+ * respondent's latest submission. Sending again replaces them.
+ */
+export async function saveFollowUp(
+  db: Database,
+  quiz: PublicQuiz,
+  input: { tokenHash: string | null; entries: { questionId: number; answerIds: number[] }[] },
+): Promise<Record<string, number[]>> {
+  const notYet = () => new PublicError(409, "quiz_not_submitted", "Finish the quiz first, then answer the follow-up questions.");
+  if (!input.tokenHash) throw notYet();
+  const tokenHash = input.tokenHash;
+  return db.transaction(async (tx) => {
+    const [session] = await tx
+      .select()
+      .from(quizSessions)
+      .where(and(eq(quizSessions.quizId, quiz.id), eq(quizSessions.tokenHash, tokenHash)))
+      .orderBy(desc(quizSessions.attemptNo))
+      .limit(1)
+      .for("update");
+    if (!session || session.status !== "completed" || session.submissionId === null) throw notYet();
+
+    const follow = (await quizForAttempt(tx, quiz, session)).followUp;
+    const asQuiz = { ...quiz, questions: follow };
+    for (const e of input.entries) validateAnswer(asQuiz, e.questionId, e.answerIds);
+    const answers = Object.fromEntries(input.entries.filter((e) => e.answerIds.length).map((e) => [String(e.questionId), e.answerIds]));
+    const missing = follow.filter((q) => q.required && !answers[String(q.id)]).map((q) => q.id);
+    if (missing.length) {
+      throw new PublicError(422, "quiz_missing_answers", "Some required questions haven't been answered.", { questionIds: missing });
+    }
+
+    const [sub] = await tx.select({ extra: submissions.extraAnswers }).from(submissions).where(eq(submissions.id, session.submissionId));
+    const post = extraSnapshot(follow, answers).map((q) => ({ ...q, part: "post" as const }));
+    const kept = ((sub?.extra ?? []) as ExtraAnswer[]).filter((q) => q.part !== "post");
+    await tx.update(submissions).set({ extraAnswers: [...kept, ...post] }).where(eq(submissions.id, session.submissionId));
+    if (follow.length) {
+      await tx
+        .delete(submissionAnswers)
+        .where(and(eq(submissionAnswers.submissionId, session.submissionId), inArray(submissionAnswers.questionId, follow.map((q) => q.id))));
+    }
+    const rows = extraRows(session.submissionId, quiz.id, post, follow);
+    if (rows.length) await tx.insert(submissionAnswers).values(rows);
+    return answers;
+  });
 }

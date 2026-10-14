@@ -99,6 +99,34 @@ export const FAQ: FaqSection[] = [
         ),
       },
       {
+        id: "question-parts",
+        question: "Can I ask questions that don't count towards the result?",
+        answer: (
+          <>
+            <p>
+              Yes. On a question card, set <Ui>When it&rsquo;s asked</Ui> to one of these. Neither kind has weights or
+              affects the result, and both answers are saved with the submission.
+            </p>
+            <ul className="list-disc pl-5">
+              <li>
+                <Ui>Before the quiz (not scored)</Ui>, for things like grade or school. These are asked first, in
+                the same flow as the scored questions.
+              </li>
+              <li>
+                <Ui>Follow-up after the result (not scored)</Ui>, for things like &ldquo;Was this useful?&rdquo;.
+                These appear under the result, after the respondent has seen their match. Skipping them never
+                changes the result.
+              </li>
+            </ul>
+            <p>
+              The Questions tab groups cards by when they&rsquo;re asked. A submission&rsquo;s page shows these
+              answers in their own sections, and the CSV export has a <Ui>Part</Ui> column. Like any content change,
+              it&rsquo;s a draft until you publish.
+            </p>
+          </>
+        ),
+      },
+      {
         id: "reorder",
         question: "How do I change the order of questions, answers or categories?",
         answer: (

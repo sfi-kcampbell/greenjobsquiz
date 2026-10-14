@@ -9,7 +9,7 @@ import { answers, answerWeights, categories, questions, submissionAnswers } from
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError } from "./errors";
 import { bumpStructureVersion, lockQuiz } from "./quizzes";
-import { MAX_QUESTIONS, type QuestionInput } from "./validation";
+import { MAX_QUESTIONS, type QuestionInput, type QuestionPart } from "./validation";
 
 export type AnswerView = {
   id: number;
@@ -29,6 +29,7 @@ export type QuestionView = {
   maxSelect: number;
   required: boolean;
   splitMulti: boolean;
+  part: QuestionPart;
   position: number;
   answers: AnswerView[];
 };
@@ -80,6 +81,7 @@ export async function listQuestions(db: Executor, quizId: number): Promise<Quest
     maxSelect: q.maxSelect,
     required: q.required,
     splitMulti: q.splitMulti,
+    part: q.part,
     position: q.position,
     answers: answersByQuestion.get(q.id) ?? [],
   }));
@@ -117,6 +119,7 @@ export async function saveQuestion(
       maxSelect: input.maxSelect,
       required: input.required,
       splitMulti: input.splitMulti,
+      part: input.part,
     };
 
     // 1. The question itself.
