@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import type { ResultPayload } from "@/lib/public/sessions";
-import type { Attempt } from "./api";
+import type { PublicQuestion } from "@/lib/public/structure";
+import type { Answers, Attempt } from "./api";
+import { FollowUp } from "./follow-up";
 import { ResultActions } from "./result-actions";
 import { ResultBody } from "./result-body";
 
@@ -14,6 +16,9 @@ export function ResultView({
   onRetake,
   restarting,
   error,
+  followUp = [],
+  followUpSent = {},
+  onFollowUp,
 }: {
   result: ResultPayload;
   /** For the share and print links; null if unknown. */
@@ -23,6 +28,10 @@ export function ResultView({
   onRetake: (() => void) | null;
   restarting: boolean;
   error: string | null;
+  /** Follow-up questions to ask under the result (none: the section is left out). */
+  followUp?: PublicQuestion[];
+  followUpSent?: Answers;
+  onFollowUp?: (answers: Answers) => Promise<void>;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -34,6 +43,7 @@ export function ResultView({
   return (
     <div className="pltq-result flex flex-col gap-8">
       <ResultBody result={result} headingRef={headingRef} />
+      {followUp.length > 0 && onFollowUp && <FollowUp questions={followUp} sent={followUpSent} onSend={onFollowUp} />}
       {shareToken && <ResultActions shareToken={shareToken} />}
 
       {earlier.length > 0 && (

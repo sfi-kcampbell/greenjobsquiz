@@ -3,7 +3,7 @@
  * share-link revocation. Every value reaches SQL as a Drizzle parameter; sort
  * columns come from a fixed allow-list; LIKE terms are escaped.
  */
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor } from "@/lib/db/create";
 import { answers as answersTable, questions, quizCodes, quizSessions, quizzes, results, submissions } from "@/lib/db/schema";
@@ -143,7 +143,8 @@ export async function listSubmissions(db: Executor, query: SubmissionListQuery) 
   const questionTotals = db
     .select({ quizId: questions.quizId, n: count().as("n") })
     .from(questions)
-    .where(isNull(questions.archivedAt))
+    // Follow-ups are answered after submitting, so they're not in "answered".
+    .where(and(isNull(questions.archivedAt), ne(questions.part, "post")))
     .groupBy(questions.quizId)
     .as("question_totals");
 
@@ -295,6 +296,8 @@ export async function getSubmissionDetail(db: Executor, id: number) {
         stillExists: currentBody.has(a.answerId),
       })),
     })),
+    /** Not-scored answers: "before the quiz" and follow-up. */
+    extra: ((s.extraAnswers ?? []) as { questionId: number; questionTitle: string; part: "pre" | "post"; answers: { answerId: number; label: string }[] }[]),
     shareToken,
     shareRevoked: !s.shareTokenHash,
   };

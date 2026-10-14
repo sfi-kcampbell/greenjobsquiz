@@ -370,6 +370,7 @@ explicit HTTP status.
 | POST | `/quizzes/{id}/session/answers` | Batch. Also accepts `sessionKey` in the body, for `sendBeacon` |
 | POST | `/quizzes/{id}/session/restart` | New attempt. Idempotent within 5 s |
 | POST | `/quizzes/{id}/submit` | Scores, stores and returns a share token. Idempotent per session |
+| POST | `/quizzes/{id}/follow-up` | Follow-up answers for the session's submission. Replaces earlier ones; 409 before submitting |
 | GET | `/results/{token}` | The token is the credential. `no-store`, `X-Robots-Tag: noindex` |
 | GET | `/quizzes/{id}/attempts` | Attempt history for the current token |
 
@@ -504,6 +505,14 @@ warning fires while anything is dirty.
   transaction.
 - **New answers** are created when the question is saved, not when they're added.
 - **Rich text** is stored as sanitized HTML, and image uploads go to **Vercel Blob**.
+- **When it's asked** (`questions.part`): "Before the quiz" (`pre`), "Scored" (`scored`, the
+  default) or "Follow-up after the result" (`post`).
+  - Cards are grouped by part, and reorder within their group.
+  - Non-scored questions hide the weight matrix, and their weights are dropped on save. They're
+    left out of scoring, Simulate and Health.
+  - Respondents get "before" questions first, in the same flow, then the scored ones. Follow-ups
+    appear under the result and are sent to `/follow-up`.
+  - Answers to non-scored questions are snapshotted in `submissions.extra_answers`.
 
 ### Responses tab
 

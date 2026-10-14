@@ -197,10 +197,15 @@ export const questions = pgTable(
     required: boolean().notNull().default(true),
     splitMulti: boolean().notNull().default(false),
     imageUrl: text(),
+    /** "pre": asked before the quiz, "post": a follow-up under the result. Neither is scored. */
+    part: text().$type<"pre" | "scored" | "post">().notNull().default("scored"),
     position: integer().notNull().default(0),
     archivedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index("questions_quiz_position").on(t.quizId, t.position)],
+  (t) => [
+    index("questions_quiz_position").on(t.quizId, t.position),
+    check("questions_part_valid", sql`${t.part} in ('pre', 'scored', 'post')`),
+  ],
 );
 
 export const answers = pgTable(
@@ -332,6 +337,8 @@ export const submissions = pgTable(
     scores: jsonb().notNull(),
     ranked: jsonb().notNull(),
     answers: jsonb().notNull(),
+    /** Not-scored answers: "before the quiz" (at submit) and follow-ups (sent after the result). */
+    extraAnswers: jsonb().notNull().default([]),
     shareTokenHash: char({ length: 64 }).unique(),
     codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
     versionId: integer().references((): AnyPgColumn => quizVersions.id, { onDelete: "set null" }),

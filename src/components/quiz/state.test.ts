@@ -7,6 +7,7 @@ import { answeredCount, firstProblem, initialState, isSavable, overLimit, quizRe
 const question = (id: number, extra: Partial<PublicQuestion> = {}): PublicQuestion => ({
   id,
   title: `Q${id}`,
+  part: "scored",
   helpHtml: null,
   type: "single",
   minSelect: 1,
@@ -31,6 +32,7 @@ const quiz: PublicQuiz = {
   version: 1,
   structureVersion: 1,
   questions: [question(1), question(2, { required: false }), question(3)],
+  followUp: [],
 };
 
 const session = (extra: Partial<SessionResponse> = {}): SessionResponse => ({
@@ -68,7 +70,7 @@ describe("loading", () => {
   });
 
   it("shows the result for a completed attempt", () => {
-    const link = { shareToken: "b".repeat(32), resultTitle: "Forester", percent: 90, shareUrl: "", printUrl: "", resultApiUrl: "", shareImageUrl: "" };
+    const link = { shareToken: "b".repeat(32), resultTitle: "Forester", percent: 90, shareUrl: "", printUrl: "", resultApiUrl: "", shareImageUrl: "", followUp: {} };
     const s = loaded(session({ status: "completed", answeredCount: 3, result: link }), result);
     expect(s.phase).toBe("result");
     expect(s.result).toBe(result);
@@ -156,7 +158,7 @@ describe("submitting", () => {
 describe("back/forward cache refresh", () => {
   it("shows a result finished elsewhere", () => {
     const s: QuizState = { ...loaded(session()), phase: "question", index: 1 };
-    const link = { shareToken: "c".repeat(32), resultTitle: "Forester", percent: 90, shareUrl: "", printUrl: "", resultApiUrl: "", shareImageUrl: "" };
+    const link = { shareToken: "c".repeat(32), resultTitle: "Forester", percent: 90, shareUrl: "", printUrl: "", resultApiUrl: "", shareImageUrl: "", followUp: {} };
     const next = quizReducer(s, { type: "refreshed", session: session({ status: "completed", revision: 9, result: link }), result });
     expect(next).toMatchObject({ phase: "result", result, revision: 9, shareToken: "c".repeat(32) });
   });

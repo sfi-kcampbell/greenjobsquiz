@@ -30,6 +30,7 @@ import { listQuestions } from "./questions";
 import { getQuiz, lockQuiz } from "./quizzes";
 import { listResponses } from "./responses";
 import type { ScoringBundle } from "./scoring-model";
+import type { QuestionPart } from "./validation";
 
 /* --------------------------------- Content -------------------------------- */
 
@@ -49,6 +50,8 @@ export type QuizContent = {
     maxSelect: number;
     required: boolean;
     splitMulti: boolean;
+    /** Only "scored" questions count towards the result (versions from before this field: scored). */
+    part: QuestionPart;
     position: number;
     answers: { id: number; label: string; bodyHtml: string | null; position: number; weights: Weights }[];
   }[];
@@ -87,6 +90,7 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
       maxSelect: q.maxSelect,
       required: q.required,
       splitMulti: q.splitMulti,
+      part: q.part,
       position: q.position,
       answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: a.bodyHtml, position: a.position, weights: strKeys(a.weights) })),
     })),
@@ -106,7 +110,9 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
 const numKeys = (w: Weights): Record<number, number> => Object.fromEntries(Object.entries(w).map(([k, v]) => [Number(k), v]));
 
 /** Everything the scoring engine and health checks need, from either source. */
-export function bundleFromContent(content: QuizContent): ScoringBundle {
+export function bundleFromContent(all: QuizContent): ScoringBundle {
+  // "Before" and follow-up questions never count towards the result.
+  const content = { ...all, questions: all.questions.filter((q) => q.part === "scored") };
   const settings = {
     runnersUpCount: content.scoring.runnersUpCount,
     normalizePerCategory: content.scoring.normalizePerCategory,
@@ -164,6 +170,8 @@ export const sameContent = (a: QuizContent, b: QuizContent) => canonical(a) === 
 
 /* ---------------------------------- Diff ---------------------------------- */
 
+export const PART_NAMES: Record<QuestionPart, string> = { pre: "Before the quiz", scored: "Scored questions", post: "Follow-up" };
+
 const weightsEqual = (a: Weights, b: Weights) => canonical(a) === canonical(b);
 const quote = (t: string) => `“${t}”`;
 
@@ -202,6 +210,7 @@ export function diffContent(from: QuizContent, to: QuizContent): string[] {
       old.maxSelect !== q.maxSelect ||
       old.required !== q.required ||
       old.splitMulti !== q.splitMulti;
+    if (old.part !== q.part) out.push(`Moved ${label} to ${PART_NAMES[q.part]}`);
     const oa = byId(old.answers);
     const ta = byId(q.answers);
     const answersChanged =
@@ -243,23 +252,32 @@ export function diffContent(from: QuizContent, to: QuizContent): string[] {
 
 export type VersionRow = typeof quizVersions.$inferSelect & { content: QuizContent };
 
+/** Versions saved before a field existed get its default, so they compare and diff cleanly. */
+function asVersion(row: typeof quizVersions.$inferSelect): VersionRow {
+  const content = row.content as QuizContent;
+  return {
+    ...row,
+    content: { ...content, questions: content.questions.map((q) => ({ ...q, part: q.part ?? "scored" })) },
+  };
+}
+
 export async function getVersion(db: Executor, quizId: number, number: number): Promise<VersionRow | null> {
   const [row] = await db
     .select()
     .from(quizVersions)
     .where(and(eq(quizVersions.quizId, quizId), eq(quizVersions.number, number)))
     .limit(1);
-  return (row as VersionRow) ?? null;
+  return row ? asVersion(row) : null;
 }
 
 export async function getVersionById(db: Executor, id: number): Promise<VersionRow | null> {
   const [row] = await db.select().from(quizVersions).where(eq(quizVersions.id, id)).limit(1);
-  return (row as VersionRow) ?? null;
+  return row ? asVersion(row) : null;
 }
 
 async function newestVersion(db: Executor, quizId: number): Promise<VersionRow | null> {
   const [row] = await db.select().from(quizVersions).where(eq(quizVersions.quizId, quizId)).orderBy(desc(quizVersions.number)).limit(1);
-  return (row as VersionRow) ?? null;
+  return row ? asVersion(row) : null;
 }
 
 /**
@@ -314,7 +332,7 @@ export async function listVersions(db: Executor, quizId: number): Promise<Versio
     .select()
     .from(quizVersions)
     .where(eq(quizVersions.quizId, quizId))
-    .orderBy(desc(quizVersions.number))) as VersionRow[];
+    .orderBy(desc(quizVersions.number))).map(asVersion);
   if (!rows.length) return [];
   const finished = await db
     .select({ id: submissions.versionId, n: count() })
@@ -401,6 +419,7 @@ export async function restoreToDraft(db: Database, quizId: number, number: numbe
         maxSelect: q.maxSelect,
         required: q.required,
         splitMulti: q.splitMulti,
+        part: q.part,
         position: q.position,
         archivedAt: null,
       };

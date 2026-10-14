@@ -162,6 +162,23 @@ export default async function SubmissionPage({ params, searchParams }: PageProps
         </table>
       </Panel>
 
+      {(["pre", "post"] as const).map((part) => {
+        const items = d.extra.filter((q) => q.part === part);
+        if (items.length === 0) return null;
+        return (
+          <Panel key={part} id={`p-${part}`} title={part === "pre" ? "Before the quiz (not scored)" : "Follow-up answers (not scored)"}>
+            <dl className="flex flex-col gap-2 text-sm">
+              {items.map((q) => (
+                <div key={q.questionId} className="flex flex-col">
+                  <dt className="font-medium">{q.questionTitle}</dt>
+                  <dd>{q.answers.map((a) => a.label).join("; ")}</dd>
+                </div>
+              ))}
+            </dl>
+          </Panel>
+        );
+      })}
+
       <Panel id="p-transcript" title="Answers">
         <p className="text-sm text-muted">
           Titles, labels and weights as they were when this was submitted. &ldquo;Current content&rdquo; is today&apos;s text and may have changed since.

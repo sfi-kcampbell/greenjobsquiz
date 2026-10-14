@@ -93,6 +93,8 @@ const fileSchema = z
           maxSelect: z.number().int().min(1).max(MAX_ANSWERS),
           required: z.boolean(),
           splitMulti: z.boolean(),
+          /** Older files have no part: their questions are scored. */
+          part: z.enum(["pre", "scored", "post"]).default("scored"),
           answers: z
             .array(z.object({ label: z.string().trim().min(1).max(200), bodyHtml: html, weights }))
             .max(MAX_ANSWERS),
@@ -225,6 +227,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       maxSelect: q.maxSelect,
       required: q.required,
       splitMulti: q.splitMulti,
+      part: q.part,
       answers: ans
         .filter((a) => a.questionId === q.id)
         .map((a) => ({ label: a.label, bodyHtml: a.bodyHtml, weights: weightsOf(aw.filter((w) => w.answerId === a.id)) })),
@@ -378,7 +381,8 @@ export async function importQuiz(
           minSelect: single ? 1 : q.minSelect,
           maxSelect: single ? 1 : q.maxSelect,
           required: q.required,
-          splitMulti: single ? false : q.splitMulti,
+          splitMulti: single || q.part !== "scored" ? false : q.splitMulti,
+          part: q.part,
           position: i,
         })
         .returning({ id: questions.id });
@@ -387,7 +391,7 @@ export async function importQuiz(
           .insert(answers)
           .values({ questionId: row.id, label: a.label, bodyHtml: rich(a.bodyHtml), position: j })
           .returning({ id: answers.id });
-        const w = weightRows(a.weights);
+        const w = q.part === "scored" ? weightRows(a.weights) : []; // only scored questions carry weights
         if (w.length) await tx.insert(answerWeights).values(w.map((x) => ({ ...x, answerId: answer.id })));
       }
     }

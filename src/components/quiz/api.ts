@@ -135,6 +135,8 @@ export function quizApi(quizId: number, identity: Identity | null = null, getCod
     submit: () => send<SubmitResponse>(`${base}/submit`, { method: "POST", body: "{}" }),
     restart: () => send<Omit<SessionResponse, "result">>(`${base}/session/restart`, { method: "POST", body: JSON.stringify(withCode({})) }),
     checkCode: (code: string) => send<CodeCheck>(`${base}/codes/${encodeURIComponent(code)}`),
+    followUp: (answers: { questionId: number; answerIds: number[] }[]) =>
+      send<{ followUp: Answers }>(`${base}/follow-up`, { method: "POST", body: JSON.stringify({ answers }) }).then((r) => r.followUp),
     attempts: () => send<{ attempts: Attempt[] }>(`${base}/attempts`).then((r) => r.attempts),
     result: (token: string) => send<ResultLinks & { result: ResultPayload }>(`/results/${encodeURIComponent(token)}`),
   };

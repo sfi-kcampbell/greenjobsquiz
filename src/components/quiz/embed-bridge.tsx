@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-const EVENTS = ["quiz:answer", "quiz:complete", "quiz:restart"] as const;
+const EVENTS = ["quiz:answer", "quiz:complete", "quiz:restart", "quiz:followup"] as const;
 
 /**
  * Inside an iframe: tells the host page how tall the quiz is (so embed.js can

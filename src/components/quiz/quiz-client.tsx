@@ -433,6 +433,14 @@ export function QuizClient({
           onRetake={quiz.settings.retakeAllowed ? restart : null}
           restarting={state.restarting}
           error={state.error}
+          followUp={quiz.followUp ?? []}
+          followUpSent={state.followUpSent}
+          onFollowUp={async (answers) => {
+            const entries = (quiz.followUp ?? []).map((q) => ({ questionId: q.id, answerIds: answers[String(q.id)] ?? [] }));
+            const saved = await api.followUp(entries);
+            dispatch({ type: "followup_sent", answers: saved });
+            emit("quiz:followup", { answers: saved });
+          }}
         />
       )}
 

@@ -3,7 +3,7 @@ import { parseListQuery } from "@/lib/admin/submissions";
 import { getStaff } from "@/lib/auth/access";
 import { db } from "@/lib/db/client";
 import { BOM, csvRow, exportFilename } from "@/lib/export/csv";
-import { answerDetails, exportBatches, LONG_HEADER, longRows, wideCategories, wideHeader, wideRow } from "@/lib/export/submissions-export";
+import { answerDetails, exportBatches, LONG_HEADER, longRows, wideCategories, wideExtras, wideHeader, wideRow } from "@/lib/export/submissions-export";
 import { getQuiz } from "@/lib/content/quizzes";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
 
   const quiz = query.quiz ? await getQuiz(db, query.quiz) : null;
   const cats = mode === "wide" ? await wideCategories(db, query) : [];
+  const extras = mode === "wide" ? await wideExtras(db, query) : [];
   const batches = exportBatches(db, query);
   const encoder = new TextEncoder();
   let started = false;
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
       try {
         if (!started) {
           started = true;
-          controller.enqueue(encoder.encode(BOM + csvRow(mode === "wide" ? wideHeader(cats) : LONG_HEADER)));
+          controller.enqueue(encoder.encode(BOM + csvRow(mode === "wide" ? wideHeader(cats, extras) : LONG_HEADER)));
           return;
         }
         const next = await batches.next();
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
         const batch = next.value;
         let chunk = "";
         if (mode === "wide") {
-          for (const s of batch) chunk += csvRow(wideRow(s, cats));
+          for (const s of batch) chunk += csvRow(wideRow(s, cats, extras));
         } else {
           const details = await answerDetails(db, batch);
           for (const s of batch) for (const row of longRows(s, details)) chunk += csvRow(row);

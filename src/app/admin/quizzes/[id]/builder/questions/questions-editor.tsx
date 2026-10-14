@@ -23,6 +23,15 @@ function readOpen(quizId: number): Set<string> {
   }
 }
 
+const PARTS: { value: Card["part"]; title: string; hint: string }[] = [
+  { value: "pre", title: "Before the quiz", hint: "Not scored. Asked first, e.g. grade or school." },
+  { value: "scored", title: "Scored questions", hint: "Their weights decide the result." },
+  { value: "post", title: "Follow-up", hint: "Not scored. Asked under the result." },
+];
+const ORDER = { pre: 0, scored: 1, post: 2 } as const;
+/** Cards in display order: by saved part, keeping each group's order. */
+const grouped = (cards: Card[]) => [...cards].sort((a, b) => ORDER[a.savedPart] - ORDER[b.savedPart]);
+
 export function QuestionsEditor({
   quizId,
   categories,
@@ -117,9 +126,9 @@ export function QuestionsEditor({
     setBusy(false);
   }
 
-  function addCard() {
+  function addCard(part: Card["part"] = "scored") {
     if (cards.length >= MAX_QUESTIONS) return;
-    const card = emptyCard();
+    const card = emptyCard(part);
     setCards((cs) => [...cs, card]);
     setOpen((prev) => new Set(prev).add(card.key));
     focusKey.current = card.key;
@@ -158,12 +167,12 @@ export function QuestionsEditor({
 
   async function onDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
-    const before = cardsRef.current;
-    const moved = arrayMove(
-      before,
-      before.findIndex((c) => c.key === active.id),
-      before.findIndex((c) => c.key === over.id),
-    );
+    // Cards move within their group (Before / Scored / Follow-up); the list is kept in display order.
+    const before = grouped(cardsRef.current);
+    const from = before.findIndex((c) => c.key === active.id);
+    const to = before.findIndex((c) => c.key === over.id);
+    if (from < 0 || to < 0 || before[from].savedPart !== before[to].savedPart) return;
+    const moved = arrayMove(before, from, to);
     const saved = moved.filter((c) => c.id !== null);
     setCards([...saved, ...moved.filter((c) => c.id === null)]);
     setError(null);
@@ -192,13 +201,13 @@ export function QuestionsEditor({
         </p>
       )}
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && (
         <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-muted">
           No questions yet.
         </div>
-      ) : (
-        <>
-          <div className="flex justify-end">
+      )}
+      <>
+          {cards.length > 0 && <div className="flex justify-end">
             <button
               type="button"
               onClick={() => setOpen(allOpen ? new Set() : new Set(cards.map(openId)))}
@@ -206,7 +215,7 @@ export function QuestionsEditor({
             >
               {allOpen ? "Collapse all" : "Expand all"}
             </button>
-          </div>
+          </div>}
           <DndContext
             id={dndId}
             sensors={sensors}
@@ -214,36 +223,64 @@ export function QuestionsEditor({
             onDragEnd={onDragEnd}
             accessibility={{ announcements }}
           >
-            <SortableContext items={cards.map((c) => c.key)} strategy={verticalListSortingStrategy}>
-              <ol className="flex flex-col gap-3" aria-label="Questions">
-                {cards.map((card, index) => (
-                  <QuestionCard
-                    key={card.key}
-                    card={card}
-                    index={index}
-                    categories={categories}
-                    open={isOpen(card)}
-                    onToggle={() => toggle(card)}
-                    onPatch={(fn) => patch(card.key, fn)}
-                    onEdit={(fn) => edit(card.key, fn)}
-                    onSave={() => saveCard(card.key)}
-                    onDelete={() => removeCard(card, index)}
-                  />
-                ))}
-              </ol>
-            </SortableContext>
+            {PARTS.map((part) => {
+              const group = cards.filter((c) => c.savedPart === part.value);
+              return (
+                <section key={part.value} aria-labelledby={`part-${part.value}`} className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 id={`part-${part.value}`} className="text-lg font-semibold">
+                      {part.title}
+                    </h2>
+                    <p className="text-sm text-muted">{part.hint}</p>
+                  </div>
+                  {group.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-border bg-surface p-3 text-sm text-muted">None yet.</p>
+                  ) : (
+                    <SortableContext items={group.map((c) => c.key)} strategy={verticalListSortingStrategy}>
+                      <ol className="flex flex-col gap-3" aria-label={part.title}>
+                        {group.map((card, index) => (
+                          <QuestionCard
+                            key={card.key}
+                            card={card}
+                            index={index}
+                            categories={categories}
+                            open={isOpen(card)}
+                            onToggle={() => toggle(card)}
+                            onPatch={(fn) => patch(card.key, fn)}
+                            onEdit={(fn) => edit(card.key, fn)}
+                            onSave={() => saveCard(card.key)}
+                            onDelete={() => removeCard(card, index)}
+                          />
+                        ))}
+                      </ol>
+                    </SortableContext>
+                  )}
+                  {part.value !== "scored" && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => addCard(part.value)}
+                        disabled={cards.length >= MAX_QUESTIONS}
+                        className="text-sm font-medium text-brand underline underline-offset-4 disabled:opacity-50"
+                      >
+                        + Add {part.value === "pre" ? "a before-the-quiz" : "a follow-up"} question
+                      </button>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </DndContext>
-        </>
-      )}
+      </>
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={addCard}
+          onClick={() => addCard("scored")}
           disabled={cards.length >= MAX_QUESTIONS}
           className="rounded-md border border-brand px-4 py-2 font-medium text-brand hover:bg-brand/5 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          + Add question
+          + Add scored question
         </button>
         <p className="text-sm text-muted">
           {cards.length} {cards.length === 1 ? "question" : "questions"}
