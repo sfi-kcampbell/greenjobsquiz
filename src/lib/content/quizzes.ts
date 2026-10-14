@@ -6,7 +6,7 @@ import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Database, Executor } from "@/lib/db/create";
 import { categories, media, quizzes, results } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
-import { ContentError, pgError, PG_FOREIGN_KEY_VIOLATION, PG_UNIQUE_VIOLATION } from "./errors";
+import { ContentError, isReferencedError, pgError, PG_UNIQUE_VIOLATION } from "./errors";
 import type { QuizBannerInput, QuizDeliveryInput, QuizInput, QuizRespondentInput, QuizScoringInput } from "./validation";
 
 export type QuizSummary = {
@@ -104,7 +104,7 @@ export async function deleteQuiz(db: Database, id: number): Promise<void> {
     const deleted = await db.delete(quizzes).where(eq(quizzes.id, id)).returning({ id: quizzes.id });
     if (deleted.length === 0) throw new ContentError("not_found", "That quiz no longer exists.");
   } catch (error) {
-    if (pgError(error)?.code === PG_FOREIGN_KEY_VIOLATION) {
+    if (isReferencedError(error)) {
       throw new ContentError(
         "conflict",
         "This quiz has submissions, so it can't be deleted. Unpublish it instead.",

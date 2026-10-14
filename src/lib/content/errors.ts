@@ -31,3 +31,11 @@ export function pgError(error: unknown): PgErrorLike | null {
 
 export const PG_UNIQUE_VIOLATION = "23505";
 export const PG_FOREIGN_KEY_VIOLATION = "23503";
+/** What newer Postgres (e.g. Neon) reports for ON DELETE RESTRICT; older versions use 23503. */
+export const PG_RESTRICT_VIOLATION = "23001";
+
+/** The row is still referenced elsewhere (a foreign key refused the delete), on any Postgres version. */
+export function isReferencedError(error: unknown): boolean {
+  const code = pgError(error)?.code;
+  return code === PG_FOREIGN_KEY_VIOLATION || code === PG_RESTRICT_VIOLATION;
+}
