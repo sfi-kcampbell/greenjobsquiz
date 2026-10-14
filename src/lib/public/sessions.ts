@@ -6,12 +6,13 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { CODE_MESSAGES, resolveCode } from "@/lib/content/quiz-codes";
 import { loadScoringBundle } from "@/lib/content/scoring-model";
+import { bundleFromContent, existingResultIds, getVersionById, latestVersion } from "@/lib/content/versions";
 import type { Database, Executor, Tx } from "@/lib/db/create";
-import { quizSessions, quizzes, results, submissionAnswers, submissions } from "@/lib/db/schema";
+import { quizSessions, quizVersions, quizzes, results, submissionAnswers, submissions } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { score, toPercentage, type Selection } from "@/lib/scoring/engine";
 import { PublicError } from "./errors";
-import type { PublicQuiz } from "./structure";
+import { getPublishedQuizAtVersionId, type PublicQuiz } from "./structure";
 import { hashToken, newToken, shareTokenFor } from "./tokens";
 
 const SESSION_DAYS = 180;
@@ -32,6 +33,8 @@ export type SessionView = {
   total: number;
   /** Present when the latest attempt has been submitted. */
   result: { shareToken: string; resultTitle: string | null; percent: number | null } | null;
+  /** The published version this attempt is on (it finishes on the version it started). */
+  version: number;
 };
 
 /* -------------------------------- Helpers -------------------------------- */
@@ -57,7 +60,7 @@ async function submissionFor(db: Executor, submissionId: number | null) {
 
 function viewOf(quiz: PublicQuiz, row: SessionRow | null, submission: Awaited<ReturnType<typeof submissionFor>>): SessionView {
   if (!row || row.status === "abandoned") {
-    return { status: "none", attemptNo: null, revision: 0, answers: {}, currentIndex: 0, answeredCount: 0, total: quiz.questions.length, result: null };
+    return { status: "none", attemptNo: null, revision: 0, answers: {}, currentIndex: 0, answeredCount: 0, total: quiz.questions.length, result: null, version: quiz.version };
   }
   return {
     status: row.status,
@@ -75,7 +78,26 @@ function viewOf(quiz: PublicQuiz, row: SessionRow | null, submission: Awaited<Re
             percent: submission.rawSimilarity === null ? null : toPercentage(submission.rawSimilarity),
           }
         : null,
+    version: quiz.version,
   };
+}
+
+/** The quiz as an attempt sees it: the version it started on (or the latest, for older attempts). */
+async function quizForAttempt(db: Executor, quiz: PublicQuiz, row: SessionRow | null): Promise<PublicQuiz> {
+  if (!row?.versionId || row.status === "abandoned") return quiz;
+  const [v] = await db.select({ number: quizVersions.number }).from(quizVersions).where(eq(quizVersions.id, row.versionId)).limit(1);
+  if (!v || v.number === quiz.version) return quiz;
+  return (await getPublishedQuizAtVersionId(db, quiz.id, row.versionId)) ?? quiz;
+}
+
+/** The database id of the version `quiz` was built from (new attempts start on it). */
+async function versionIdOf(db: Executor, quiz: PublicQuiz): Promise<number | null> {
+  const [v] = await db
+    .select({ id: quizVersions.id })
+    .from(quizVersions)
+    .where(and(eq(quizVersions.quizId, quiz.id), eq(quizVersions.number, quiz.version)))
+    .limit(1);
+  return v?.id ?? null;
 }
 
 /** Checks one answer against the published structure. Throws 422 if it doesn't fit. */
@@ -106,7 +128,7 @@ export function validateAnswer(quiz: PublicQuiz, questionId: number, answerIds: 
 export async function getSessionView(db: Executor, quiz: PublicQuiz, tokenHash: string | null): Promise<SessionView> {
   if (!tokenHash) return viewOf(quiz, null, null);
   const row = await latestSession(db, quiz.id, tokenHash);
-  return viewOf(quiz, row, await submissionFor(db, row?.submissionId ?? null));
+  return viewOf(await quizForAttempt(db, quiz, row), row, await submissionFor(db, row?.submissionId ?? null));
 }
 
 /* --------------------------------- Writes -------------------------------- */
@@ -138,8 +160,6 @@ export async function saveAnswers(
     code?: string | null;
   },
 ): Promise<SaveResult> {
-  for (const e of input.entries) validateAnswer(quiz, e.questionId, e.answerIds);
-
   let token: string | null = null;
   let tokenHash = input.tokenHash;
   if (!tokenHash) {
@@ -151,11 +171,14 @@ export async function saveAnswers(
   if (row?.status === "completed") {
     throw new PublicError(409, "quiz_already_submitted", "This attempt was already submitted. Start over to answer again.");
   }
+  // Answers are checked against the version the attempt is on.
+  const attemptQuiz = row && row.status === "in_progress" ? await quizForAttempt(db, quiz, row) : quiz;
+  for (const e of input.entries) validateAnswer(attemptQuiz, e.questionId, e.answerIds);
   // A client with no session yet holds revision 0; a write that creates the attempt isn't stale.
   let created = false;
   if (!row || row.status === "abandoned") {
     const codeId = await codeForNewAttempt(db, quiz, input.code);
-    row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null, codeId);
+    row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null, codeId, await versionIdOf(db, quiz));
     created = true;
   }
 
@@ -187,7 +210,7 @@ export async function saveAnswers(
     tokenHash,
     revision: updated.revision,
     stale: input.clientRevision !== undefined && input.clientRevision !== previous,
-    view: viewOf(quiz, updated, null),
+    view: viewOf(attemptQuiz, updated, null),
   };
 }
 
@@ -220,10 +243,11 @@ async function createAttempt(
   attemptNo: number,
   ipHash: string | null,
   codeId: number | null = null,
+  versionId: number | null = null,
 ): Promise<SessionRow> {
   const [row] = await db
     .insert(quizSessions)
-    .values({ quizId, tokenHash, attemptNo, ipHash, codeId, expiresAt: expiry() })
+    .values({ quizId, tokenHash, attemptNo, ipHash, codeId, versionId, expiresAt: expiry() })
     .onConflictDoNothing()
     .returning();
   if (row) return row;
@@ -252,7 +276,7 @@ export async function restart(
     answeredCount(latest.answers) === 0 &&
     Date.now() - latest.startedAt.getTime() < RESTART_IDEMPOTENCY_MS
   ) {
-    return viewOf(quiz, latest, null);
+    return viewOf(await quizForAttempt(db, quiz, latest), latest, null);
   }
 
   if (!quiz.settings.retakeAllowed) {
@@ -266,11 +290,12 @@ export async function restart(
 
   // A retake keeps the code it started with unless a new one is given.
   const codeId = code ? await codeForNewAttempt(db, quiz, code) : (latest.codeId ?? (await codeForNewAttempt(db, quiz, null)));
+  const versionId = await versionIdOf(db, quiz);
   const row = await db.transaction(async (tx) => {
     if (latest.status === "in_progress") {
       await tx.update(quizSessions).set({ status: "abandoned" }).where(eq(quizSessions.id, latest.id));
     }
-    return createAttempt(tx, quiz.id, tokenHash, latest.attemptNo + 1, ipHash ?? null, codeId);
+    return createAttempt(tx, quiz.id, tokenHash, latest.attemptNo + 1, ipHash ?? null, codeId, versionId);
   });
   return viewOf(quiz, row, null);
 }
@@ -309,7 +334,8 @@ export async function submit(
     }
 
     const answers = session.answers;
-    const missing = quiz.questions.filter((q) => q.required && !(answers[String(q.id)]?.length)).map((q) => q.id);
+    const attemptQuiz = await quizForAttempt(tx, quiz, session);
+    const missing = attemptQuiz.questions.filter((q) => q.required && !(answers[String(q.id)]?.length)).map((q) => q.id);
     if (missing.length) {
       throw new PublicError(422, "quiz_missing_answers", "Some required questions haven't been answered.", { questionIds: missing });
     }
@@ -329,7 +355,9 @@ async function storeSubmission(
   session: SessionRow,
   input: { email?: string | null; ipHash?: string | null; referrer?: string | null },
 ): Promise<{ shareToken: string; submissionId: number }> {
-  const bundle = await loadScoringBundle(tx, quiz.id);
+  // Scored with the version the attempt is on, never the unpublished draft.
+  const version = session.versionId ? await getVersionById(tx, session.versionId) : await latestVersion(tx, quiz.id);
+  const bundle = version ? bundleFromContent(version.content) : await loadScoringBundle(tx, quiz.id);
   const selections: Selection[] = Object.entries(session.answers)
     .filter(([, ids]) => ids.length > 0)
     .map(([questionId, answerIds]) => ({ questionId: Number(questionId), answerIds }));
@@ -374,6 +402,8 @@ async function storeSubmission(
   });
 
   const match = result.match;
+  // A response deleted from the draft since this version was published keeps its title, not its id.
+  const matchExists = match ? (await existingResultIds(tx, [match.resultId])).has(match.resultId) : false;
   const durationSeconds = Math.max(0, Math.round((Date.now() - session.startedAt.getTime()) / 1000));
   const [row] = await tx
     .insert(submissions)
@@ -383,7 +413,8 @@ async function storeSubmission(
       codeId: session.codeId,
       tokenHash: session.tokenHash,
       attemptNo: session.attemptNo,
-      resultId: match?.resultId ?? null,
+      resultId: match && matchExists ? match.resultId : null,
+      versionId: version?.id ?? null,
       resultTitle: match ? (resultTitles.get(match.resultId) ?? null) : null,
       rawSimilarity: match && !result.isFallback ? Math.round(match.raw * 1e6) / 1e6 : null,
       topCategoryId: top?.[0] ?? null,
@@ -467,10 +498,17 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
   const scores = submission.scores as StoredScores;
   const ranked = submission.ranked as StoredRanked;
 
-  // Current content for the responses involved (titles fall back to the snapshot).
+  // Response text from the latest published version (never an unpublished draft);
+  // titles fall back to the snapshot.
+  const latest = await latestVersion(db, quiz.id);
   const ids = [...new Set([submission.resultId, ...ranked.map((r) => r.resultId)].filter((id): id is number => id !== null))];
-  const current = ids.length ? await db.select().from(results).where(inArray(results.id, ids)) : [];
+  const current = latest
+    ? latest.content.responses.filter((r) => ids.includes(r.id))
+    : ids.length
+      ? await db.select().from(results).where(inArray(results.id, ids))
+      : [];
   const content = new Map(current.map((r) => [r.id, r]));
+  const runnersUpCount = latest?.content.scoring.runnersUpCount ?? quiz.runnersUpCount;
 
   let match: ResultPayload["match"] = null;
   if (submission.resultId !== null || submission.resultTitle) {
@@ -489,7 +527,7 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
 
   const runnersUp = scores.isFallback
     ? []
-    : ranked.slice(1, 1 + quiz.runnersUpCount).map((r) => {
+    : ranked.slice(1, 1 + runnersUpCount).map((r) => {
         const c = content.get(r.resultId);
         return { resultId: r.resultId, title: c?.title ?? r.title, excerpt: c?.excerpt ?? null, percent: toPercentage(r.raw), raw: r.raw };
       });

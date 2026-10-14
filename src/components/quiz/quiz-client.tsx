@@ -145,7 +145,12 @@ export function QuizClient({
     (async () => {
       try {
         // In parallel: the structure is cacheable, the session never is.
-        const [quiz, fetched] = await Promise.all([api.structure(), api.session()]);
+        const [latest, fetched] = await Promise.all([api.structure(), api.session()]);
+        // An attempt finishes on the version it started on, even if a newer one was published since.
+        const quiz =
+          fetched.status === "in_progress" && fetched.version && fetched.version !== latest.version
+            ? await api.structure(fetched.version)
+            : latest;
         const result =
           fetched.status === "completed" && fetched.result ? (await api.result(fetched.result.shareToken)).result : null;
         if (cancelled) return;
@@ -266,6 +271,11 @@ export function QuizClient({
     await queue.settle();
     try {
       const session = await api.restart();
+      // A newer version was published since this page loaded: start the new attempt on it.
+      if (state.quiz && session.version && session.version !== state.quiz.version) {
+        window.location.reload();
+        return;
+      }
       queue.sync(session.revision, session.attemptNo);
       dispatch({ type: "restarted", revision: session.revision });
       emit("quiz:restart", { attemptNo: session.attemptNo });

@@ -4,7 +4,7 @@
  * scoring key would turn the quiz into a lookup table.
  */
 import { and, asc, eq } from "drizzle-orm";
-import { listQuestions } from "@/lib/content/questions";
+import { getVersion, getVersionById, latestVersion, type VersionRow } from "@/lib/content/versions";
 import type { Executor } from "@/lib/db/create";
 import { media, quizzes } from "@/lib/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
@@ -42,6 +42,9 @@ export type PublicQuiz = {
     /** New attempts need a quiz code (from the link, or typed in). */
     requireCode: boolean;
   };
+  /** The published version these questions come from. */
+  version: number;
+  /** Same as `version` (kept for older clients). */
   structureVersion: number;
   questions: PublicQuestion[];
 };
@@ -98,22 +101,20 @@ export async function getPublishedQuizPage(db: Executor, slug: string): Promise<
   return { quiz, ...row };
 }
 
-/** Only published quizzes; drafts look exactly like missing ones. */
-export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slug: string }): Promise<PublicQuiz | null> {
-  const where = "id" in ref ? eq(quizzes.id, ref.id) : eq(quizzes.slug, ref.slug);
-  const [quiz] = await db
-    .select()
-    .from(quizzes)
-    .where(and(where, eq(quizzes.status, "published")))
-    .limit(1);
-  if (!quiz) return null;
+type QuizRow = typeof quizzes.$inferSelect;
 
-  const questions = await listQuestions(db, quiz.id);
+/**
+ * A version's content plus the quiz's live settings (slug, banner, layout,
+ * respondent options). Explicit field picks: weights are dropped here and
+ * must never be added.
+ */
+async function publicFromVersion(db: Executor, quiz: QuizRow, version: VersionRow): Promise<PublicQuiz> {
+  const c = version.content;
   return {
     id: quiz.id,
     slug: quiz.slug,
-    title: quiz.title,
-    introHtml: sanitizeRichText(quiz.introHtml, PUBLIC),
+    title: c.title,
+    introHtml: sanitizeRichText(c.introHtml, PUBLIC),
     banner: await bannerFor(db, quiz.bannerMediaId, quiz.bannerAlt),
     layout: quiz.layout,
     settings: {
@@ -121,12 +122,12 @@ export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slu
       showProgress: quiz.showProgress,
       retakeAllowed: quiz.retakeAllowed,
       autoAdvance: quiz.autoAdvance,
-      runnersUpCount: quiz.runnersUpCount,
+      runnersUpCount: c.scoring.runnersUpCount,
       requireCode: quiz.requireCode,
     },
-    structureVersion: quiz.structureVersion,
-    // Explicit field picks: weights are dropped here and must never be added.
-    questions: questions.map((q) => ({
+    version: version.number,
+    structureVersion: version.number,
+    questions: c.questions.map((q) => ({
       id: q.id,
       title: q.title,
       helpHtml: sanitizeRichText(q.helpHtml, PUBLIC),
@@ -137,4 +138,32 @@ export async function getPublishedQuiz(db: Executor, ref: { id: number } | { slu
       answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: sanitizeRichText(a.bodyHtml, PUBLIC) })),
     })),
   };
+}
+
+/**
+ * Only published quizzes (drafts look exactly like missing ones), as their
+ * latest published version, or `version` when given.
+ */
+export async function getPublishedQuiz(
+  db: Executor,
+  ref: { id: number } | { slug: string },
+  opts: { version?: number } = {},
+): Promise<PublicQuiz | null> {
+  const where = "id" in ref ? eq(quizzes.id, ref.id) : eq(quizzes.slug, ref.slug);
+  const [quiz] = await db
+    .select()
+    .from(quizzes)
+    .where(and(where, eq(quizzes.status, "published")))
+    .limit(1);
+  if (!quiz) return null;
+  const version = opts.version ? await getVersion(db, quiz.id, opts.version) : await latestVersion(db, quiz.id);
+  return version ? publicFromVersion(db, quiz, version) : null;
+}
+
+/** The quiz as of a particular version (for an attempt that started on it). */
+export async function getPublishedQuizAtVersionId(db: Executor, quizId: number, versionId: number): Promise<PublicQuiz | null> {
+  const version = await getVersionById(db, versionId);
+  if (!version || version.quizId !== quizId) return null;
+  const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, quizId)).limit(1);
+  return quiz ? publicFromVersion(db, quiz, version) : null;
 }

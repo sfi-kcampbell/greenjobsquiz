@@ -297,6 +297,8 @@ export const quizSessions = pgTable(
     submissionId: integer(),
     /** The quiz code the attempt started with, if any. */
     codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
+    /** The published version the attempt started on (null: before versions existed → latest). */
+    versionId: integer().references((): AnyPgColumn => quizVersions.id, { onDelete: "set null" }),
     ipHash: char({ length: 64 }),
     startedAt: createdAt(),
     updatedAt: updatedAt(),
@@ -332,6 +334,7 @@ export const submissions = pgTable(
     answers: jsonb().notNull(),
     shareTokenHash: char({ length: 64 }).unique(),
     codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
+    versionId: integer().references((): AnyPgColumn => quizVersions.id, { onDelete: "set null" }),
     shareExpiresAt: timestamp({ withTimezone: true }),
     email: text(),
     questionsAnswered: smallint().notNull().default(0),
@@ -477,4 +480,29 @@ export const quizCodes = pgTable(
     archivedAt: timestamp({ withTimezone: true }),
   },
   (t) => [index("quiz_codes_quiz").on(t.quizId), check("quiz_codes_format", sql`${t.code} ~ '^[A-Z0-9]{4,20}$'`)],
+);
+
+/* -------------------------------------------------------------------------- */
+/* Versions                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Published versions of a quiz's content (title, intro, categories,
+ * questions, answers, responses, weights, scoring settings). Admins edit the
+ * working copy in the content tables; the public site serves versions only.
+ */
+export const quizVersions = pgTable(
+  "quiz_versions",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    quizId: integer()
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    number: integer().notNull(),
+    content: jsonb().notNull(),
+    publishedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    publishedBy: text(),
+    note: text(),
+  },
+  (t) => [uniqueIndex("quiz_versions_quiz_number").on(t.quizId, t.number)],
 );

@@ -55,14 +55,14 @@ describe.skipIf(!TEST_DATABASE_URL)("media, banner and custom CSS (Postgres)", (
     await expect(storeMedia(db, { bytes: big })).rejects.toMatchObject({ code: "too_large" });
   });
 
-  it("sets, replaces and removes the banner, bumping the structure version", async () => {
+  it("sets, replaces and removes the banner (a live setting, no new version needed)", async () => {
     await setQuizStatus(db, quizId, "published");
-    const v0 = (await getQuiz(db, quizId))!.structureVersion;
     const a = await storeMedia(db, { bytes: png(1200, 300) });
     await updateQuizBanner(db, quizId, quizBannerInput.parse({ mediaId: a.id, alt: "Students planting trees" }));
     let pub = (await getPublishedQuiz(db, { id: quizId }))!;
     expect(pub.banner).toEqual({ url: `/media/${a.id}`, alt: "Students planting trees", width: 1200, height: 300 });
-    expect(pub.structureVersion).toBeGreaterThan(v0);
+    // The banner is a live setting: it shows without publishing a new version.
+    expect(pub.version).toBe(1);
 
     const b = await storeMedia(db, { bytes: png(800, 200, 1) });
     await updateQuizBanner(db, quizId, quizBannerInput.parse({ mediaId: b.id, alt: "" }));

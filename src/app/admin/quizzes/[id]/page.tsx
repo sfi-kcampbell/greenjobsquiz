@@ -15,6 +15,8 @@ import { updateQuizCssAction } from "../actions";
 import { DuplicateQuizButton } from "../quiz-file-controls";
 import { BannerForm } from "./banner-form";
 import { CodesSection } from "./codes-section";
+import { VersionsSection } from "./versions-section";
+import { draftChanges, listVersions } from "@/lib/content/versions";
 import { codeDayValues } from "@/lib/content/quiz-code-rules";
 import { listCodes, suggestCode } from "@/lib/content/quiz-codes";
 import { loadBundle, loadQuiz } from "./load";
@@ -37,6 +39,8 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
   const apiUrl = `/api/v1/quizzes/${quiz.id}`;
   const pageUrl = `/quizzes/${quiz.slug}`;
   const staff = await requireStaff();
+  const draft = await draftChanges(db, quiz.id);
+  const versions = await listVersions(db, quiz.id);
   const recent = await listAudit(db, { superAdmin: staff.role === "super_admin", quizId: quiz.id, pageSize: 8 });
   const bannerMeta = quiz.bannerMediaId ? await getMediaMeta(db, quiz.bannerMediaId) : null;
   const banner = bannerMeta
@@ -73,8 +77,32 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
           Publishing
         </h2>
         <ConfigWarning />
-        <PublishControl quizId={quiz.id} status={quiz.status} healthWarnings={healthWarnings} apiUrl={apiUrl} pageUrl={pageUrl} />
+        <PublishControl
+          quizId={quiz.id}
+          status={quiz.status}
+          healthWarnings={healthWarnings}
+          apiUrl={apiUrl}
+          pageUrl={pageUrl}
+          latest={
+            draft
+              ? { number: draft.latest.number, publishedAt: draft.latest.publishedAt.toISOString(), publishedBy: draft.latest.publishedBy }
+              : null
+          }
+          changes={draft?.changes ?? []}
+        />
       </section>
+
+      {versions.length > 0 && (
+        <section aria-labelledby="versions" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+          <h2 id="versions" className="font-semibold">
+            Versions
+          </h2>
+          <VersionsSection
+            quizId={quiz.id}
+            versions={versions.map((v) => ({ ...v, publishedAt: v.publishedAt.toISOString() }))}
+          />
+        </section>
+      )}
 
       <section aria-labelledby="delivery" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
         <h2 id="delivery" className="font-semibold">

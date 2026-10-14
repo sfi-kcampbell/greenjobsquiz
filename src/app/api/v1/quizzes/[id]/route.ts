@@ -5,7 +5,8 @@ import { structureResponse } from "../structure-response";
 export const dynamic = "force-dynamic";
 
 export const GET = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]">) =>
-  structureResponse(req, await loadPublishedQuiz((await ctx.params).id)),
+  // ?version=N: an older published version, for an attempt that started on it.
+  structureResponse(req, await loadPublishedQuiz((await ctx.params).id, req.nextUrl.searchParams.get("version"))),
 );
 
 export const OPTIONS = preflight;
