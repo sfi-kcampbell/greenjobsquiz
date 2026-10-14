@@ -4,6 +4,7 @@ import type { ResultPayload } from "./sessions";
 
 const base: ResultPayload = {
   quiz: { id: 1, title: "Green Jobs", slug: "green-jobs", deliveryMode: "hosted" },
+  locale: "en",
   createdAt: "2026-10-09T00:00:00.000Z",
   attemptNo: 1,
   status: "scored",

@@ -16,7 +16,7 @@ const body = z.object({
 
 /** Saves one question's answer. The first write creates the session. */
 export const PUT = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/session/answer">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const input = await readBody(req, body);
   return saveAndRespond(req, quiz, {
     entries: [{ questionId: input.questionId, answerIds: input.answerIds }],

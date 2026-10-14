@@ -16,7 +16,10 @@ import { DuplicateQuizButton } from "../quiz-file-controls";
 import { BannerForm } from "./banner-form";
 import { CodesSection } from "./codes-section";
 import { VersionsSection } from "./versions-section";
-import { draftChanges, listVersions } from "@/lib/content/versions";
+import { draftChanges, listVersions, readWorkingContent } from "@/lib/content/versions";
+import { translationStatus } from "@/lib/content/translations";
+import { EXTRA_LOCALES } from "@/lib/i18n/locales";
+import { LanguagesForm } from "./languages-form";
 import { codeDayValues } from "@/lib/content/quiz-code-rules";
 import { listCodes, suggestCode } from "@/lib/content/quiz-codes";
 import { loadBundle, loadQuiz } from "./load";
@@ -42,6 +45,7 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
   const draft = await draftChanges(db, quiz.id);
   const versions = await listVersions(db, quiz.id);
   const recent = await listAudit(db, { superAdmin: staff.role === "super_admin", quizId: quiz.id, pageSize: 8 });
+  const translated = await translationStatus(db, quiz.id, await readWorkingContent(db, quiz.id));
   const bannerMeta = quiz.bannerMediaId ? await getMediaMeta(db, quiz.bannerMediaId) : null;
   const banner = bannerMeta
     ? { mediaId: bannerMeta.id, url: mediaUrl(bannerMeta.id), alt: quiz.bannerAlt ?? "", width: bannerMeta.width, height: bannerMeta.height }
@@ -121,6 +125,22 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         {quiz.status === "published" && quiz.deliveryMode === "hosted" && (
           <EmbedSnippet origin={await requestOrigin()} slug={quiz.slug} title={quiz.title} />
         )}
+      </section>
+
+      <section aria-labelledby="languages" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <h2 id="languages" className="font-semibold">
+          Languages
+        </h2>
+        <LanguagesForm
+          quizId={quiz.id}
+          hasBanner={Boolean(banner)}
+          rows={EXTRA_LOCALES.map((locale) => ({
+            locale,
+            offered: quiz.languages.includes(locale),
+            ...translated[locale],
+            bannerAlt: quiz.bannerAltTranslations[locale] ?? "",
+          }))}
+        />
       </section>
 
       <section aria-labelledby="banner" className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">

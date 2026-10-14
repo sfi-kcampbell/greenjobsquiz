@@ -230,3 +230,21 @@ Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`
 - **Storage:** the answers are stored with the submission (`submissions.extra_answers`, plus `submission_answers` rows).
 - **Admin views:** the submission page shows them in their own sections, and the CSV export has a **Part** column (long) or one column per question (wide).
 - **Embeds:** sending follow-ups posts a `quiz:followup` event to the host page.
+
+## Languages
+
+- **Languages:** English is the source language. Each quiz can also be offered in Spanish and French (quiz settings → **Languages**).
+- **Who translates what:**
+  - **Admins** translate the quiz's text in the builder's **Translations** tab.
+  - **Built-in text** (buttons and messages) comes translated, from `src/lib/i18n/messages/`. Have a native speaker review `es.ts` and `fr.ts` before announcing.
+- **Publishing:** translations are part of the draft, so they go live with **Publish changes**.
+- **Untranslated text:** anything untranslated shows in English.
+- **Needs review:** if the English changes after a text was translated, it's flagged **Needs review**.
+- **Choosing a language:**
+  - The language comes from `?lang=` on `/quizzes/{slug}`, `/embed/{slug}` and `/q/{CODE}`; otherwise it follows the browser's `Accept-Language`.
+  - A **Language** menu lets respondents switch; their answers are kept.
+- **API:** quiz requests take `?lang=`. Responses include `quiz.locale` and `quiz.languages`.
+- **Submissions and results:**
+  - Submissions record `locale`. Their snapshots stay in English.
+  - Shared results, the printable page and the share card use the language the quiz was taken in.
+- **Adding a language:** add `src/lib/i18n/messages/{code}.ts` (typed against `en.ts`) and an entry in `src/lib/i18n/locales.ts`.

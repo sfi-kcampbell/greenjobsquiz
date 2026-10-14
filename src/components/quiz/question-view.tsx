@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PublicQuestion } from "@/lib/public/structure";
 import { QuestionFieldset } from "./question-fieldset";
 import { overLimit, selectionProblem } from "./state";
+import { useMessages } from "./i18n";
 
 /**
  * One question as a real form: fieldset/legend, native radios or checkboxes,
@@ -35,12 +36,13 @@ export function QuestionView({
   onBack: (() => void) | null;
   onNext: () => void;
 }) {
+  const m = useMessages();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const [showProblem, setShowProblem] = useState(false);
-  const problem = selectionProblem(question, selected);
+  const problem = selectionProblem(question, selected, m);
   // Over the maximum shows straight away; other problems wait for Next.
-  const message = overLimit(question, selected.length) || (showProblem && problem) || error;
+  const message = overLimit(question, selected.length, m) || (showProblem && problem) || error;
 
   // Move focus to the new question so keyboard and screen-reader users start there.
   // Sent back with a problem (e.g. a missing answer on submit)? Focus its first answer,
@@ -81,7 +83,7 @@ export function QuestionView({
             disabled={busy}
             className="pltq-button rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
           >
-            Back
+            {m.back}
           </button>
         )}
         <button

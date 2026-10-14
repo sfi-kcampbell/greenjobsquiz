@@ -1,13 +1,23 @@
+import { headers } from "next/headers";
 import Link from "next/link";
+import { messagesFor } from "@/lib/i18n";
+import { LOCALES, pickLocale, type Locale } from "@/lib/i18n/locales";
 
-export default function ResultNotFound() {
+/** Shown in the browser's language (the link doesn't say which language was wanted). */
+async function browserLocale() {
+  return pickLocale(null, (await headers()).get("accept-language"), Object.keys(LOCALES) as Locale[]);
+}
+
+export default async function ResultNotFound() {
+  const locale = await browserLocale();
+  const m = messagesFor(locale);
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-4 px-6 py-16">
-      <h1 className="text-2xl font-semibold">This result link isn&apos;t valid</h1>
-      <p className="text-muted">It may have been mistyped, or removed.</p>
+    <main lang={locale} className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-4 px-6 py-16">
+      <h1 className="text-2xl font-semibold">{m.resultLinkInvalid}</h1>
+      <p className="text-muted">{m.resultLinkInvalidHint}</p>
       <p>
         <Link href="/quizzes" className="text-brand underline underline-offset-4">
-          See all quizzes
+          {m.seeAllQuizzes}
         </Link>
       </p>
     </main>

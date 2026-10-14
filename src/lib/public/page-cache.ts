@@ -2,6 +2,7 @@ import "server-only";
 import { unstable_cache, updateTag } from "next/cache";
 import { getSiteCss } from "@/lib/content/settings";
 import { db } from "@/lib/db/client";
+import { pickLocale } from "@/lib/i18n/locales";
 import { getPublishedQuizPage, listPublishedQuizzes } from "./structure";
 
 /**
@@ -11,11 +12,23 @@ import { getPublishedQuizPage, listPublishedQuizzes } from "./structure";
  */
 export const QUIZ_PAGES_TAG = "quiz-pages";
 
+/** One cache entry per quiz and language. */
 export const getCachedQuizPage = unstable_cache(
-  async (slug: string) => getPublishedQuizPage(db, slug),
+  async (slug: string, locale: string = "en") => getPublishedQuizPage(db, slug, locale),
   ["public-quiz-page"],
   { tags: [QUIZ_PAGES_TAG], revalidate: 300 },
 );
+
+/**
+ * The page in the language to show: `lang` (?lang=) if the quiz offers it,
+ * else the browser's best offered language, else English.
+ */
+export async function getLocalizedQuizPage(slug: string, lang: unknown, acceptLanguage: string | null) {
+  const english = await getCachedQuizPage(slug, "en");
+  if (!english) return null;
+  const locale = pickLocale(lang, acceptLanguage, english.quiz.languages);
+  return locale === "en" ? english : ((await getCachedQuizPage(slug, locale)) ?? english);
+}
 
 /** Hosted quizzes only: headless ones live on their own front end. */
 export const getCachedPublishedQuizzes = unstable_cache(

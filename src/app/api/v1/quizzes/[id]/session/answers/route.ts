@@ -20,7 +20,7 @@ const body = z.object({
 
 /** Batch save, used to flush unsent answers when the page closes. */
 export const POST = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/session/answers">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const input = await readBody(req, body);
   return saveAndRespond(req, quiz, {
     sessionKey: input.sessionKey,

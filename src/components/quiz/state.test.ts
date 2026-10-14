@@ -33,6 +33,8 @@ const quiz: PublicQuiz = {
   structureVersion: 1,
   questions: [question(1), question(2, { required: false }), question(3)],
   followUp: [],
+  locale: "en",
+  languages: ["en"],
 };
 
 const session = (extra: Partial<SessionResponse> = {}): SessionResponse => ({
@@ -234,6 +236,12 @@ describe("helpers", () => {
     expect(overLimit(multi, 3)).toBeNull();
     expect(overLimit(multi, 4)).toBe("You can choose up to 3. Untick 1 to continue.");
     expect(overLimit(question(1), 2)).toBeNull();
+  });
+
+  it("words problems in the quiz's language", () => {
+    expect(firstProblem({ ...quiz, locale: "es" }, { "3": [31] })).toEqual({ index: 0, message: "Elige una respuesta para continuar." });
+    const s = quizReducer({ ...loaded(session()), quiz: { ...quiz, locale: "fr" }, answers: {}, phase: "review" }, { type: "submit" });
+    expect(s.error).toBe("Choisissez une réponse pour continuer.");
   });
 
   it("firstProblem finds the first blocking question", () => {

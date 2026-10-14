@@ -6,7 +6,7 @@ import { db } from "@/lib/db/client";
 import { settings } from "@/lib/db/schema";
 import { clientIpHash, hit } from "@/lib/rate-limit/fixed-window";
 import { notFound, PublicError } from "./errors";
-import { getPublishedQuiz, type PublicQuiz } from "./structure";
+import { getPublishedQuiz, type LocaleRequest, type PublicQuiz } from "./structure";
 import { hashToken, isToken } from "./tokens";
 
 /**
@@ -144,13 +144,21 @@ export async function readBody<T extends z.ZodType>(req: NextRequest, schema: T)
   return parsed.data;
 }
 
-/** The latest published version, or `version` (an older one an attempt is still on). */
-export async function loadPublishedQuiz(idParam: string, version?: string | null): Promise<PublicQuiz> {
+/** The language a request asks for: `?lang=`, else its Accept-Language. */
+export function localeRequest(req: NextRequest): LocaleRequest {
+  return { locale: req.nextUrl.searchParams.get("lang"), acceptLanguage: req.headers.get("accept-language") };
+}
+
+/**
+ * The latest published version, or `version` (an older one an attempt is
+ * still on), in the language the request asks for.
+ */
+export async function loadPublishedQuiz(idParam: string, req: NextRequest, version?: string | null): Promise<PublicQuiz> {
   const id = z.coerce.number().int().positive().safeParse(idParam);
   if (!id.success) throw notFound();
   const v = version ? z.coerce.number().int().positive().safeParse(version) : null;
   if (v && !v.success) throw notFound();
-  const quiz = await getPublishedQuiz(db, { id: id.data }, { version: v?.data });
+  const quiz = await getPublishedQuiz(db, { id: id.data }, { version: v?.data, ...localeRequest(req) });
   if (!quiz) throw notFound();
   return quiz;
 }

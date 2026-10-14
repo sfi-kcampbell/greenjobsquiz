@@ -698,6 +698,27 @@ allowed origins in Settings, and the default allows all.
 
 ---
 
+### Languages
+
+- **Source language:** English. A quiz offers extra languages (`quizzes.languages`, live) from the
+  supported set in `src/lib/i18n/locales.ts` (es, fr).
+- **Content translations:**
+  - **Storage:** they live in `translations` (`quiz_id`, `locale`, `key` = "kind:id:field",
+    `text`, `source_hash`), and are copied into each version's `content.translations` on publish.
+  - **Public reads:** `localizeContent` overlays them field by field; anything missing falls back
+    to English.
+  - **Out of date:** `source_hash` flags a translation whose English has changed since.
+- **Interface text:** one catalog per language (`src/lib/i18n/messages`), typed against `en.ts`.
+  Server and client share `messagesFor(locale)`. API errors are shown by code from the catalog.
+- **Picking the language:** `?lang=`, then `Accept-Language`, then English, limited to the quiz's
+  offered languages.
+  - **Respondent pages:** dynamic, with the quiz data cached per language.
+  - **API:** sends `Vary: Accept-Language`, and puts the locale in the ETag.
+- **Sessions and submissions:**
+  - They record `locale`. Scoring and snapshots are language-independent: snapshots stay in
+    English.
+  - Shared results use the submission's language.
+
 ## Privacy
 
 - **No raw IPs:** only `ip_hash`, an HMAC with the pepper.

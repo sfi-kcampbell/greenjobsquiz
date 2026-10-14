@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /** Checks a quiz code before starting (for the "Quiz code" box). Rate-limited against guessing. */
 export const GET = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/codes/[code]">) => {
   const params = await ctx.params;
-  const quiz = await loadPublishedQuiz(params.id);
+  const quiz = await loadPublishedQuiz(params.id, req);
   await rateLimit("code", null);
   const resolved = await resolveCode(db, quiz.id, decodeURIComponent(params.code));
   return respond(

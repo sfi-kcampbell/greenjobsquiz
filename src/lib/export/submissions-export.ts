@@ -119,7 +119,7 @@ export async function wideExtras(db: Executor, query: SubmissionListQuery): Prom
   return stored.map((e) => ({ id: Number(e.id), title: e.title, part: e.part })).sort((a, b) => rank(a) - rank(b));
 }
 
-const BASE_HEADERS = ["Submission ID", "Attempt", "Date (UTC)", "Quiz", "Email", "Matched response", "Quiz code"];
+const BASE_HEADERS = ["Submission ID", "Attempt", "Date (UTC)", "Quiz", "Email", "Matched response", "Quiz code", "Language"];
 
 export function wideHeader(cats: WideCategory[], extras: WideExtra[] = []): string[] {
   return [
@@ -147,6 +147,7 @@ export function wideRow(s: ExportRow, cats: WideCategory[], extras: WideExtra[] 
     s.email,
     s.resultTitle,
     s.code,
+    s.locale,
     s.rawSimilarity === null ? null : toPercentage(s.rawSimilarity),
     s.rawSimilarity,
     s.topCategoryId === null ? null : (scores[String(s.topCategoryId)]?.label ?? null),
@@ -203,6 +204,7 @@ export function longRows(s: ExportRow, details: Map<number, string>): Cell[][] {
     s.email,
     s.resultTitle,
     s.code,
+    s.locale,
     PART_LABEL[part],
     (seen[part] = (seen[part] ?? 0) + 1), // numbered within its part
     q.questionTitle,

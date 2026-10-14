@@ -7,6 +7,7 @@ const TABS = [
   { slug: "categories", label: "Categories" },
   { slug: "questions", label: "Questions" },
   { slug: "responses", label: "Responses" },
+  { slug: "translations", label: "Translations" },
   { slug: "simulate", label: "Simulate" },
   { slug: "health", label: "Health" },
 ] as const;

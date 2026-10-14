@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api";
+import { messagesFor } from "@/lib/i18n";
 import { errorMessage, saveErrorMessage } from "./messages";
 
 describe("respondent error messages", () => {
@@ -14,9 +15,18 @@ describe("respondent error messages", () => {
     expect(errorMessage(new Error("boom"))).toMatch(/on our side/);
   });
 
-  it("passes on the server's own message for other errors", () => {
-    expect(errorMessage(conflict)).toBe("This attempt was already submitted.");
-    expect(saveErrorMessage(conflict)).toBe("This attempt was already submitted.");
+  it("words known errors in the respondent's language, and passes on the server's message for others", () => {
+    expect(errorMessage(conflict)).toBe("This attempt was already submitted. Start over to answer again.");
+    expect(errorMessage(conflict, messagesFor("es"))).toBe("Este intento ya se envió. Empieza de nuevo para volver a responder.");
+    const other = new ApiError(422, "quiz_something_new", "A new kind of problem.");
+    expect(errorMessage(other)).toBe("A new kind of problem.");
+    expect(saveErrorMessage(other, messagesFor("fr"))).toBe("A new kind of problem.");
+    expect(errorMessage(network, messagesFor("fr"))).toMatch(/connexion/);
+  });
+
+  it("explains a quiz code problem by its reason", () => {
+    const closed = new ApiError(422, "quiz_code_invalid", "That code has closed.", { reason: "closed" });
+    expect(errorMessage(closed, messagesFor("es"))).toBe("Ese código ya no está activo.");
   });
 
   it("says why a save failed", () => {

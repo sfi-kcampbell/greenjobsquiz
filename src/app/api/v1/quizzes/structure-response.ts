@@ -9,6 +9,9 @@ import type { PublicQuiz } from "@/lib/public/structure";
  */
 export async function structureResponse(req: NextRequest, quiz: PublicQuiz) {
   const hash = createHash("sha256").update(JSON.stringify(quiz)).digest("base64url").slice(0, 16);
-  const etag = `"q${quiz.id}-v${quiz.version}-${hash}"`;
-  return (await notModified(req, etag)) ?? respond(req, { quiz }, { caching: { kind: "public", etag } });
+  const etag = `"q${quiz.id}-v${quiz.version}-${quiz.locale}-${hash}"`;
+  const res = (await notModified(req, etag)) ?? await respond(req, { quiz }, { caching: { kind: "public", etag } });
+  // Without ?lang= the language comes from Accept-Language, so shared caches must key on it.
+  res.headers.append("Vary", "Accept-Language");
+  return res;
 }

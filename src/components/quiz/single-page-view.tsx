@@ -5,6 +5,7 @@ import type { PublicQuestion, PublicQuiz } from "@/lib/public/structure";
 import type { Answers } from "./api";
 import { QuestionFieldset } from "./question-fieldset";
 import { overLimit, picked, selectionProblem } from "./state";
+import { useMessages } from "./i18n";
 
 /**
  * Every question in one form ("All on one page"). Problems show on submit;
@@ -29,6 +30,7 @@ export function SinglePageView({
   onSelect: (question: PublicQuestion, index: number, answerIds: number[], how: { fromArrowKey: boolean }) => void;
   onSubmit: () => void;
 }) {
+  const m = useMessages();
   const [showProblems, setShowProblems] = useState(false);
   const firstInputs = useRef<(HTMLInputElement | null)[]>([]);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -42,8 +44,8 @@ export function SinglePageView({
   const messageFor = (q: PublicQuestion, i: number) => {
     const ids = picked(answers, q.id);
     return (
-      overLimit(q, ids.length) ||
-      (showProblems ? selectionProblem(q, ids) : null) ||
+      overLimit(q, ids.length, m) ||
+      (showProblems ? selectionProblem(q, ids, m) : null) ||
       (error && errorIndex === i ? error : null)
     );
   };
@@ -54,7 +56,7 @@ export function SinglePageView({
       onSubmit={(event) => {
         event.preventDefault();
         if (busy) return;
-        const first = quiz.questions.findIndex((q) => selectionProblem(q, picked(answers, q.id)));
+        const first = quiz.questions.findIndex((q) => selectionProblem(q, picked(answers, q.id), m));
         if (first >= 0) {
           setShowProblems(true);
           firstInputs.current[first]?.focus();
@@ -65,7 +67,7 @@ export function SinglePageView({
       className="flex flex-col gap-10"
     >
       <h2 ref={headingRef} tabIndex={-1} className="sr-only">
-        {total} questions
+        {m.questionCount(total)}
       </h2>
       {quiz.questions.map((q, i) => (
         <div key={q.id} className="flex flex-col gap-4">
@@ -93,7 +95,7 @@ export function SinglePageView({
           disabled={busy}
           className="pltq-button pltq-button--primary rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
-          {busy ? "Working out your result…" : "See my result"}
+          {busy ? m.workingOut : m.seeMyResult}
         </button>
       </div>
     </form>

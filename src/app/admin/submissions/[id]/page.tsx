@@ -6,6 +6,7 @@ import { requireSuperAdmin } from "@/lib/auth/access";
 import { db } from "@/lib/db/client";
 import { dateTime, duration } from "../format";
 import { DeleteSubmissionButton, RevokeShareButton } from "./detail-actions";
+import { isLocale, LOCALE_NAMES_EN } from "@/lib/i18n/locales";
 
 export const metadata: Metadata = { title: "Submission" };
 
@@ -73,6 +74,8 @@ export default async function SubmissionPage({ params, searchParams }: PageProps
           <dd className="break-all">{d.referrer ?? "—"}</dd>
           <dt className="text-muted">IP hash</dt>
           <dd className="font-mono text-xs">{d.ipHashShort ? `${d.ipHashShort}…` : "—"}</dd>
+          <dt className="text-muted">Language</dt>
+          <dd>{isLocale(d.locale) ? LOCALE_NAMES_EN[d.locale] : d.locale}</dd>
           <dt className="text-muted">Scoring engine</dt>
           <dd>v{d.engineVersion}</dd>
         </dl>

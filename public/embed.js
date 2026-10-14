@@ -3,6 +3,7 @@
  *   <script src="https://YOUR-QUIZ-SITE/embed.js" async></script>
  * It sizes each quiz iframe to its content and re-dispatches the quiz's
  * events (quiz:answer, quiz:complete, quiz:restart, quiz:followup) on the iframe element.
+ * Language: add ?lang=es (or another language the quiz offers) to the iframe's src.
  */
 (function () {
   "use strict";

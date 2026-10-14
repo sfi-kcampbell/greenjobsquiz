@@ -12,7 +12,9 @@ import { quizSessions, quizVersions, quizzes, results, submissionAnswers, submis
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { score, toPercentage, type Selection } from "@/lib/scoring/engine";
 import { PublicError } from "./errors";
-import { getPublishedQuizAtVersionId, type PublicQuiz } from "./structure";
+import { localizeContent, translationKey } from "@/lib/content/localize";
+import { offeredLocales, type Locale } from "@/lib/i18n/locales";
+import { getPublishedQuiz, getPublishedQuizAtVersionId, type PublicQuiz } from "./structure";
 import { hashToken, newToken, shareTokenFor } from "./tokens";
 
 const SESSION_DAYS = 180;
@@ -93,12 +95,18 @@ function viewOf(quiz: PublicQuiz, row: SessionRow | null, submission: Awaited<Re
   };
 }
 
+/** The same quiz in English (submissions snapshot titles and labels in English, whatever the respondent's language). */
+async function inEnglish(db: Executor, quiz: PublicQuiz): Promise<PublicQuiz> {
+  if (quiz.locale === "en") return quiz;
+  return (await getPublishedQuiz(db, { id: quiz.id }, { version: quiz.version, locale: "en" })) ?? quiz;
+}
+
 /** The quiz as an attempt sees it: the version it started on (or the latest, for older attempts). */
 async function quizForAttempt(db: Executor, quiz: PublicQuiz, row: SessionRow | null): Promise<PublicQuiz> {
   if (!row?.versionId || row.status === "abandoned") return quiz;
   const [v] = await db.select({ number: quizVersions.number }).from(quizVersions).where(eq(quizVersions.id, row.versionId)).limit(1);
   if (!v || v.number === quiz.version) return quiz;
-  return (await getPublishedQuizAtVersionId(db, quiz.id, row.versionId)) ?? quiz;
+  return (await getPublishedQuizAtVersionId(db, quiz.id, row.versionId, { locale: quiz.locale })) ?? quiz;
 }
 
 /** The database id of the version `quiz` was built from (new attempts start on it). */
@@ -189,7 +197,7 @@ export async function saveAnswers(
   let created = false;
   if (!row || row.status === "abandoned") {
     const codeId = await codeForNewAttempt(db, quiz, input.code);
-    row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null, codeId, await versionIdOf(db, quiz));
+    row = await createAttempt(db, quiz.id, tokenHash, (row?.attemptNo ?? 0) + 1, input.ipHash ?? null, codeId, await versionIdOf(db, quiz), quiz.locale);
     created = true;
   }
 
@@ -207,6 +215,8 @@ export async function saveAnswers(
       answers: sql`(${quizSessions.answers} - ${`{${remove.join(",")}}`}::text[]) || ${JSON.stringify(patch)}::jsonb`,
       revision: sql`${quizSessions.revision} + 1`,
       currentIndex: input.currentIndex ?? sql`${quizSessions.currentIndex}`,
+      // The language the respondent is using now (they can switch mid-quiz).
+      locale: quiz.locale,
       expiresAt: expiry(),
     })
     .where(and(eq(quizSessions.id, row.id), eq(quizSessions.status, "in_progress")))
@@ -255,10 +265,11 @@ async function createAttempt(
   ipHash: string | null,
   codeId: number | null = null,
   versionId: number | null = null,
+  locale = "en",
 ): Promise<SessionRow> {
   const [row] = await db
     .insert(quizSessions)
-    .values({ quizId, tokenHash, attemptNo, ipHash, codeId, versionId, expiresAt: expiry() })
+    .values({ quizId, tokenHash, attemptNo, ipHash, codeId, versionId, locale, expiresAt: expiry() })
     .onConflictDoNothing()
     .returning();
   if (row) return row;
@@ -306,7 +317,7 @@ export async function restart(
     if (latest.status === "in_progress") {
       await tx.update(quizSessions).set({ status: "abandoned" }).where(eq(quizSessions.id, latest.id));
     }
-    return createAttempt(tx, quiz.id, tokenHash, latest.attemptNo + 1, ipHash ?? null, codeId, versionId);
+    return createAttempt(tx, quiz.id, tokenHash, latest.attemptNo + 1, ipHash ?? null, codeId, versionId, quiz.locale);
   });
   return viewOf(quiz, row, null);
 }
@@ -409,8 +420,9 @@ async function storeSubmission(
   const selections: Selection[] = Object.entries(session.answers)
     .filter(([questionId, ids]) => ids.length > 0 && scoredIds.has(Number(questionId)))
     .map(([questionId, answerIds]) => ({ questionId: Number(questionId), answerIds }));
+  const english = await inEnglish(tx, attemptQuiz);
   const extraAnswers = extraSnapshot(
-    attemptQuiz.questions.filter((q) => q.part === "pre"),
+    english.questions.filter((q) => q.part === "pre"),
     session.answers,
   );
   const result = score(bundle.model, selections);
@@ -467,6 +479,7 @@ async function storeSubmission(
       attemptNo: session.attemptNo,
       resultId: match && matchExists ? match.resultId : null,
       versionId: version?.id ?? null,
+      locale: attemptQuiz.locale,
       resultTitle: match ? (resultTitles.get(match.resultId) ?? null) : null,
       rawSimilarity: match && !result.isFallback ? Math.round(match.raw * 1e6) / 1e6 : null,
       topCategoryId: top?.[0] ?? null,
@@ -498,7 +511,7 @@ async function storeSubmission(
       position: bundle.model.questions.findIndex((x) => x.id === q.questionId),
     })),
   );
-  rows.push(...extraRows(row.id, quiz.id, extraAnswers, attemptQuiz.questions));
+  rows.push(...extraRows(row.id, quiz.id, extraAnswers, english.questions));
   if (rows.length) await tx.insert(submissionAnswers).values(rows);
 
   return { shareToken, submissionId: row.id };
@@ -508,6 +521,8 @@ async function storeSubmission(
 
 export type ResultPayload = {
   quiz: { id: number; title: string; slug: string; deliveryMode: "hosted" | "headless" };
+  /** The language the quiz was taken in; text is shown in it where translated. */
+  locale: string;
   createdAt: string;
   attemptNo: number;
   status: "scored" | "insufficient_data" | "no_results";
@@ -539,10 +554,17 @@ type StoredRanked = { resultId: number; raw: number; title: string }[];
 export const shareOfMax = (raw: number, max: number) =>
   max > 0 ? Math.round(100 * Math.max(0, Math.min(1, raw / max))) : 0;
 
-/** The token is the credential; unknown or revoked tokens look the same. */
-export async function getResultByShareToken(db: Executor, shareToken: string): Promise<ResultPayload | null> {
+/**
+ * The token is the credential; unknown or revoked tokens look the same.
+ * Shown in the language the quiz was taken in, or `opts.locale` (e.g. the
+ * respondent switched language since) when the quiz offers it.
+ */
+export async function getResultByShareToken(db: Executor, shareToken: string, opts: { locale?: string | null } = {}): Promise<ResultPayload | null> {
   const [row] = await db
-    .select({ submission: submissions, quiz: { id: quizzes.id, title: quizzes.title, slug: quizzes.slug, deliveryMode: quizzes.deliveryMode, runnersUpCount: quizzes.runnersUpCount } })
+    .select({
+      submission: submissions,
+      quiz: { id: quizzes.id, title: quizzes.title, slug: quizzes.slug, deliveryMode: quizzes.deliveryMode, runnersUpCount: quizzes.runnersUpCount, languages: quizzes.languages },
+    })
     .from(submissions)
     .innerJoin(quizzes, eq(quizzes.id, submissions.quizId))
     .where(eq(submissions.shareTokenHash, hashToken(shareToken)))
@@ -552,9 +574,12 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
   const scores = submission.scores as StoredScores;
   const ranked = submission.ranked as StoredRanked;
 
-  // Response text from the latest published version (never an unpublished draft);
-  // titles fall back to the snapshot.
-  const latest = await latestVersion(db, quiz.id);
+  // Response text from the latest published version (never an unpublished draft), in the
+  // language the quiz was taken in where translated; titles fall back to the snapshot.
+  const published = await latestVersion(db, quiz.id);
+  const locale = opts.locale && offeredLocales(quiz.languages).includes(opts.locale as Locale) ? opts.locale : submission.locale;
+  const latest = published && { ...published, content: localizeContent(published.content, locale) };
+  const t = published?.content.translations?.[locale] ?? {};
   const ids = [...new Set([submission.resultId, ...ranked.map((r) => r.resultId)].filter((id): id is number => id !== null))];
   const current = latest
     ? latest.content.responses.filter((r) => ids.includes(r.id))
@@ -587,7 +612,8 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
       });
 
   return {
-    quiz: { id: quiz.id, title: quiz.title, slug: quiz.slug, deliveryMode: quiz.deliveryMode },
+    quiz: { id: quiz.id, title: t[translationKey("quiz", 0, "title")] || quiz.title, slug: quiz.slug, deliveryMode: quiz.deliveryMode },
+    locale,
     createdAt: submission.createdAt.toISOString(),
     attemptNo: submission.attemptNo,
     status: scores.status,
@@ -598,7 +624,13 @@ export async function getResultByShareToken(db: Executor, shareToken: string): P
     scores: Object.fromEntries(
       Object.entries(scores.categories).map(([id, s]) => [
         id,
-        { raw: s.raw, normalized: s.normalized, percent: shareOfMax(s.raw, s.max), label: s.label, color: s.color },
+        {
+          raw: s.raw,
+          normalized: s.normalized,
+          percent: shareOfMax(s.raw, s.max),
+          label: t[translationKey("category", Number(id), "name")] || s.label,
+          color: s.color,
+        },
       ]),
     ),
   };
@@ -654,7 +686,8 @@ export async function saveFollowUp(
     }
 
     const [sub] = await tx.select({ extra: submissions.extraAnswers }).from(submissions).where(eq(submissions.id, session.submissionId));
-    const post = extraSnapshot(follow, answers).map((q) => ({ ...q, part: "post" as const }));
+    const followEnglish = (await inEnglish(tx, await quizForAttempt(tx, quiz, session))).followUp;
+    const post = extraSnapshot(followEnglish, answers).map((q) => ({ ...q, part: "post" as const }));
     const kept = ((sub?.extra ?? []) as ExtraAnswer[]).filter((q) => q.part !== "post");
     await tx.update(submissions).set({ extraAnswers: [...kept, ...post] }).where(eq(submissions.id, session.submissionId));
     if (follow.length) {

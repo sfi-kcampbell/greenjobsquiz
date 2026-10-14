@@ -3,6 +3,7 @@
 import { useId, useRef, type Ref } from "react";
 import type { PublicQuestion } from "@/lib/public/structure";
 import { RichHtml } from "./rich-html";
+import { useMessages } from "./i18n";
 
 /**
  * One question's fieldset: legend with its number, help, native radios or
@@ -30,6 +31,7 @@ export function QuestionFieldset({
   headingRef?: Ref<HTMLHeadingElement>;
   firstInputRef?: Ref<HTMLInputElement>;
 }) {
+  const m = useMessages();
   const uid = useId();
   /** Whether the latest key or pointer action in this question was an arrow key. */
   const lastWasArrow = useRef(false);
@@ -58,8 +60,8 @@ export function QuestionFieldset({
       >
         <legend className="mb-4 w-full">
           <span className="block text-sm font-medium text-muted">
-            Question {number} of {total}
-            {!question.required && " (optional)"}
+            {m.questionOf(number, total)}
+            {!question.required && m.optional}
           </span>
           <h2 ref={headingRef} tabIndex={-1} className="pltq-question-title mt-1 text-xl focus:outline-none font-semibold sm:text-2xl">
             {question.title}
@@ -69,8 +71,8 @@ export function QuestionFieldset({
         {multi && (
           <p className="text-sm text-muted">
             {question.minSelect === question.maxSelect
-              ? `Choose ${question.maxSelect}.`
-              : `Choose ${question.minSelect} to ${question.maxSelect}.`}
+              ? m.chooseExactly(question.maxSelect)
+              : m.chooseRange(question.minSelect, question.maxSelect)}
           </p>
         )}
 

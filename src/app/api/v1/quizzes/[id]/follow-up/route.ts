@@ -17,7 +17,7 @@ const body = z.object({
  * respondent's latest submission; sending again replaces them.
  */
 export const POST = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/follow-up">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const input = await readBody(req, body);
   const identity = identify(req);
   await checkWriteOrigin(req, identity);

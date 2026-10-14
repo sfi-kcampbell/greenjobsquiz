@@ -14,6 +14,7 @@ const base: QuizContent = {
     { id: 11, title: "Tools?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, part: "scored", position: 1, answers: [{ id: 110, label: "Saw", bodyHtml: null, position: 0, weights: { "1": 2 } }] },
   ],
   responses: [{ id: 50, title: "Forester", excerpt: null, bodyHtml: "", ctaUrl: null, ctaLabel: null, position: 0, weights: { "1": 5 } }],
+  translations: {},
 };
 
 describe("diffContent", () => {

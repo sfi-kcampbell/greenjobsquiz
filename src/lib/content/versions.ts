@@ -23,6 +23,7 @@ import {
   submissionAnswers,
   submissions,
 } from "@/lib/db/schema";
+import { isLocale, LOCALE_NAMES_EN } from "@/lib/i18n/locales";
 import type { ScoringModel } from "@/lib/scoring/engine";
 import { listCategories } from "./categories";
 import { ContentError } from "./errors";
@@ -30,6 +31,8 @@ import { listQuestions } from "./questions";
 import { getQuiz, lockQuiz } from "./quizzes";
 import { listResponses } from "./responses";
 import type { ScoringBundle } from "./scoring-model";
+import type { Translations } from "./localize";
+import { readTranslations, replaceTranslations } from "./translations";
 import type { QuestionPart } from "./validation";
 
 /* --------------------------------- Content -------------------------------- */
@@ -65,6 +68,8 @@ export type QuizContent = {
     position: number;
     weights: Weights;
   }[];
+  /** Admins' translations (locale → "kind:id:field" → text); see ./localize. Older versions: none. */
+  translations: Translations;
 };
 
 const strKeys = (w: Record<number | string, number>): Weights => Object.fromEntries(Object.entries(w).map(([k, v]) => [String(k), v]));
@@ -76,7 +81,7 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
   const cats = await listCategories(db, quizId);
   const qs = await listQuestions(db, quizId);
   const rs = await listResponses(db, quizId);
-  return {
+  const content: QuizContent = {
     title: quiz.title,
     introHtml: quiz.introHtml,
     scoring: { normalizePerCategory: quiz.normalizePerCategory, runnersUpCount: quiz.runnersUpCount, defaultResultId: quiz.defaultResultId },
@@ -104,7 +109,10 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
       position: r.position,
       weights: strKeys(r.weights),
     })),
+    translations: {},
   };
+  content.translations = await readTranslations(db, quizId, content);
+  return content;
 }
 
 const numKeys = (w: Weights): Record<number, number> => Object.fromEntries(Object.entries(w).map(([k, v]) => [Number(k), v]));
@@ -245,6 +253,15 @@ export function diffContent(from: QuizContent, to: QuizContent): string[] {
   if (from.responses.map((r) => r.id).filter((id) => tr.has(id)).join() !== to.responses.map((r) => r.id).filter((id) => fr.has(id)).join()) {
     out.push("Reordered responses");
   }
+
+  const locales = [...new Set([...Object.keys(from.translations ?? {}), ...Object.keys(to.translations ?? {})])].sort();
+  for (const locale of locales) {
+    const a = from.translations?.[locale] ?? {};
+    const b = to.translations?.[locale] ?? {};
+    const changed = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => a[k] !== b[k]).length;
+    const name = isLocale(locale) ? LOCALE_NAMES_EN[locale] : locale;
+    if (changed) out.push(`Updated ${name} translations (${changed})`);
+  }
   return out;
 }
 
@@ -257,7 +274,11 @@ function asVersion(row: typeof quizVersions.$inferSelect): VersionRow {
   const content = row.content as QuizContent;
   return {
     ...row,
-    content: { ...content, questions: content.questions.map((q) => ({ ...q, part: q.part ?? "scored" })) },
+    content: {
+      ...content,
+      questions: content.questions.map((q) => ({ ...q, part: q.part ?? "scored" })),
+      translations: content.translations ?? {},
+    },
   };
 }
 
@@ -469,6 +490,8 @@ export async function restoreToDraft(db: Database, quizId: number, number: numbe
         updatedAt: new Date(),
       })
       .where(eq(quizzes.id, quizId));
+
+    await replaceTranslations(tx, quizId, c);
   });
 }
 

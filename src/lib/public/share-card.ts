@@ -2,6 +2,7 @@
  * What a result's share card shows. Pure, so it's tested without rendering;
  * the card route turns this into a 1200×630 PNG.
  */
+import { messagesFor } from "@/lib/i18n";
 import type { ResultPayload } from "./sessions";
 
 export const CARD_SIZE = { width: 1200, height: 630 } as const;
@@ -15,6 +16,8 @@ export type CardContent = {
   lead: string;
   title: string;
   percent: number | null;
+  /** "86% match", in the result's language (null without a percent). */
+  percentText: string | null;
   categories: { label: string; color: string; percent: number }[];
   alt: string;
 };
@@ -28,6 +31,7 @@ export function trimText(text: string, max: number): string {
 }
 
 export function cardContent(result: ResultPayload): CardContent {
+  const m = messagesFor(result.locale);
   const quizTitle = trimText(result.quiz.title, 60);
   const categories = Object.values(result.scores)
     .sort((a, b) => b.percent - a.percent || a.label.localeCompare(b.label))
@@ -37,30 +41,33 @@ export function cardContent(result: ResultPayload): CardContent {
     return {
       quizTitle,
       lead: quizTitle,
-      title: "Take the quiz to find your match",
+      title: m.cardNoMatch,
       percent: null,
+      percentText: null,
       categories,
-      alt: `${quizTitle}: take the quiz to find your match`,
+      alt: m.cardAltNoMatch(quizTitle),
     };
   }
   const title = trimText(result.match.title, 48);
   const percent = !result.isFallback && result.match.percent !== null ? result.match.percent : null;
   return {
     quizTitle,
-    lead: "My best match",
+    lead: m.cardLead,
     title,
     percent,
+    percentText: percent !== null ? m.percentMatch(percent) : null,
     categories,
-    alt: `${quizTitle} result: my best match is ${title}${percent !== null ? `, a ${percent}% match` : ""}.`,
+    alt: m.cardAlt(quizTitle, title, percent),
   };
 }
 
 /** Link-preview title and description for the share page. */
 export function shareMetadataText(result: ResultPayload) {
+  const m = messagesFor(result.locale);
   const quiz = result.quiz.title;
-  if (!result.match) return { title: `My result on ${quiz}`, description: `Take ${quiz} to find careers that fit you.` };
+  if (!result.match) return { title: m.metaTitleNoMatch(quiz), description: m.metaDescriptionNoMatch(quiz) };
   return {
-    title: `I got ${result.match.title} on ${quiz}`,
-    description: trimText(result.match.excerpt ?? `See which careers fit you best. Take ${quiz} too.`, 200),
+    title: m.metaTitle(result.match.title, quiz),
+    description: trimText(result.match.excerpt ?? m.metaDescription(quiz), 200),
   };
 }

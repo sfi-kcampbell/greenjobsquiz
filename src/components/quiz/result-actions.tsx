@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, useState } from "react";
+import { useMessages } from "./i18n";
 
 const noSubscribe = () => () => {};
 
@@ -11,6 +12,7 @@ const noSubscribe = () => () => {};
  */
 export function ResultActions({ shareToken }: { shareToken: string }) {
   const origin = useSyncExternalStore(noSubscribe, () => window.location.origin, () => "");
+  const m = useMessages();
   const [status, setStatus] = useState("");
   const shareUrl = `${origin}/quiz-result/${shareToken}`;
   const canShare = useSyncExternalStore(noSubscribe, () => typeof navigator.share === "function", () => false);
@@ -18,7 +20,7 @@ export function ResultActions({ shareToken }: { shareToken: string }) {
   const share = async () => {
     if (canShare) {
       try {
-        await navigator.share({ title: "My quiz result", url: shareUrl });
+        await navigator.share({ title: m.shareTitle, url: shareUrl });
         return;
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return; // closed the share sheet
@@ -26,9 +28,9 @@ export function ResultActions({ shareToken }: { shareToken: string }) {
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setStatus("Link copied.");
+      setStatus(m.linkCopied);
     } catch {
-      setStatus("Copy the link below.");
+      setStatus(m.copyBelow);
     }
   };
 
@@ -36,20 +38,21 @@ export function ResultActions({ shareToken }: { shareToken: string }) {
   return (
     <section aria-labelledby="keep-result" className="no-print flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       <h3 id="keep-result" className="font-semibold">
-        Keep or share your result
+        {m.keepOrShare}
       </h3>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => window.print()} className={button}>
-          Print
+          {m.print}
         </button>
         <button type="button" onClick={share} className={button}>
-          {canShare ? "Share" : "Copy link"}
+          {canShare ? m.share : m.copyLink}
         </button>
         <a href={`/quiz-result/${shareToken}`} target="_blank" rel="noopener" className={`${button} inline-block`}>
-          Printable page<span className="sr-only"> (opens in a new tab)</span>
+          {m.printablePage}
+          <span className="sr-only">{m.opensInNewTab}</span>
         </a>
         <a href={`/quiz-result/${shareToken}/card?download=1`} download className={`${button} inline-block`}>
-          Download image
+          {m.downloadImage}
         </a>
         <p role="status" className="text-sm text-brand">
           {status}
@@ -57,7 +60,7 @@ export function ResultActions({ shareToken }: { shareToken: string }) {
       </div>
       <div className="flex flex-col gap-1 text-sm">
         <label htmlFor="share-url" className="text-muted">
-          Anyone with this link can see this result:
+          {m.anyoneWithLink}
         </label>
         <input
           id="share-url"

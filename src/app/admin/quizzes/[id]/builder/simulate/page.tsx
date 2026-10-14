@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { localizeContent } from "@/lib/content/localize";
+import { bundleFromContent, readWorkingContent } from "@/lib/content/versions";
+import { db } from "@/lib/db/client";
+import { EXTRA_LOCALES, isLocale, LOCALE_NAMES_EN, type Locale } from "@/lib/i18n/locales";
 import { loadBundle, loadQuiz } from "../../load";
 import { SimulatorLoader } from "./loader";
 
 export const metadata: Metadata = { title: "Simulate" };
 
-export default async function SimulatePage({ params }: PageProps<"/admin/quizzes/[id]/builder/simulate">) {
+export default async function SimulatePage({ params, searchParams }: PageProps<"/admin/quizzes/[id]/builder/simulate">) {
   const quiz = await loadQuiz((await params).id);
   const bundle = await loadBundle(quiz.id);
+  // Preview the text in another language (scoring is the same in every language).
+  const asked = (await searchParams).lang;
+  const locale: Locale = isLocale(asked) ? asked : "en";
+  const display = locale === "en" ? bundle.display : bundleFromContent(localizeContent(await readWorkingContent(db, quiz.id), locale)).display;
 
   return (
     <section aria-labelledby="simulate-heading" className="flex flex-col gap-4">
@@ -19,10 +28,24 @@ export default async function SimulatePage({ params }: PageProps<"/admin/quizzes
           will use, with the saved questions, responses and scoring settings. Nothing here is recorded.
         </p>
       </div>
+      <nav aria-label="Preview language" className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">Language:</span>
+        {(["en", ...EXTRA_LOCALES] as Locale[]).map((l) => (
+          <Link
+            key={l}
+            href={l === "en" ? "?" : `?lang=${l}`}
+            aria-current={l === locale ? "page" : undefined}
+            className={`rounded-md border px-2.5 py-1 ${l === locale ? "border-brand bg-brand/10 font-medium" : "border-border hover:bg-border/40"}`}
+          >
+            {LOCALE_NAMES_EN[l]}
+          </Link>
+        ))}
+      </nav>
       <SimulatorLoader
+        key={locale}
         quizId={quiz.id}
         model={bundle.model}
-        display={bundle.display}
+        display={display}
         runnersUpCount={bundle.settings.runnersUpCount}
       />
     </section>

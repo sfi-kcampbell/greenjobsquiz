@@ -11,10 +11,13 @@
 import { and, asc, eq, inArray, isNull, like } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor } from "@/lib/db/create";
-import { answers, answerWeights, categories, media, questions, quizzes, results, resultWeights } from "@/lib/db/schema";
+import { answers, answerWeights, categories, media, questions, quizzes, results, resultWeights, translations } from "@/lib/db/schema";
+import { DEFAULT_LOCALE, EXTRA_LOCALES, isLocale } from "@/lib/i18n/locales";
 import { MediaError, mediaUrl, storeMedia } from "@/lib/media/media";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError } from "./errors";
+import { translationKey, type TranslationKind } from "./localize";
+import { hashText } from "./translations";
 import {
   categoryInput,
   customCssInput,
@@ -45,6 +48,10 @@ const MEDIA_REF = /\/media\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 const key = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/i, "Keys must be short identifiers.");
 const html = z.string().max(20_000).nullable();
 const weights = z.record(key, z.number().min(-5).max(5));
+/** An item's translations: locale → field → text (older files have none). */
+const itemTranslations = z
+  .record(z.string().regex(/^[a-z]{2}$/), z.record(z.string().max(40), z.string().max(50_000)))
+  .default({});
 
 const fileSchema = z
   .object({
@@ -69,7 +76,12 @@ const fileSchema = z
       resultHeadline: z.string().max(300).nullable(),
       customCss: z.string(),
       defaultResponse: key.nullable(),
-      banner: z.object({ image: z.string(), alt: z.string().max(300) }).nullable(),
+      banner: z
+        .object({ image: z.string(), alt: z.string().max(300), altTranslations: z.record(z.string(), z.string().max(300)).default({}) })
+        .nullable(),
+      /** Languages offered besides English. */
+      languages: z.array(z.string().max(10)).max(20).default([]),
+      translations: itemTranslations,
     }),
     categories: z
       .array(
@@ -80,6 +92,7 @@ const fileSchema = z
           color: z.string(),
           importance: z.number(),
           description: z.string().max(2000).nullable(),
+          translations: itemTranslations,
         }),
       )
       .max(MAX_CATEGORIES),
@@ -96,8 +109,9 @@ const fileSchema = z
           /** Older files have no part: their questions are scored. */
           part: z.enum(["pre", "scored", "post"]).default("scored"),
           answers: z
-            .array(z.object({ label: z.string().trim().min(1).max(200), bodyHtml: html, weights }))
+            .array(z.object({ label: z.string().trim().min(1).max(200), bodyHtml: html, weights, translations: itemTranslations }))
             .max(MAX_ANSWERS),
+          translations: itemTranslations,
         }),
       )
       .max(MAX_QUESTIONS),
@@ -111,6 +125,7 @@ const fileSchema = z
           ctaUrl: z.string().nullable(),
           ctaLabel: z.string().nullable(),
           weights,
+          translations: itemTranslations,
         }),
       )
       .max(MAX_RESPONSES),
@@ -173,12 +188,28 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
     .orderBy(asc(results.position), asc(results.id));
   const rw = rs.length ? await db.select().from(resultWeights).where(inArray(resultWeights.resultId, rs.map((r) => r.id))) : [];
 
+  const trRows = await db.select().from(translations).where(eq(translations.quizId, quizId));
+  /** An item's translations as locale → field → text. */
+  const trOf = (kind: TranslationKind, id: number) => {
+    const out: Record<string, Record<string, string>> = {};
+    const prefix = `${kind}:${id}:`;
+    for (const r of trRows) if (r.key.startsWith(prefix)) (out[r.locale] ??= {})[r.key.slice(prefix.length)] = r.text;
+    return out;
+  };
+
   const catKey = new Map(cats.map((c, i) => [c.id, `c${i + 1}`]));
   const respKey = new Map(rs.map((r, i) => [r.id, `r${i + 1}`]));
   const weightsOf = (rows: { categoryId: number; weight: number }[]) =>
     Object.fromEntries(rows.filter((w) => catKey.has(w.categoryId)).map((w) => [catKey.get(w.categoryId)!, w.weight]));
 
-  const ids = mediaIdsIn([quiz.introHtml, ...qs.map((q) => q.helpHtml), ...ans.map((a) => a.bodyHtml), ...rs.map((r) => r.bodyHtml), quiz.customCss]);
+  const ids = mediaIdsIn([
+    quiz.introHtml,
+    ...qs.map((q) => q.helpHtml),
+    ...ans.map((a) => a.bodyHtml),
+    ...rs.map((r) => r.bodyHtml),
+    quiz.customCss,
+    ...trRows.map((r) => r.text),
+  ]);
   if (quiz.bannerMediaId) ids.add(quiz.bannerMediaId);
   const files = ids.size
     ? await db
@@ -209,7 +240,12 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       resultHeadline: quiz.resultHeadline,
       customCss: quiz.customCss,
       defaultResponse: quiz.defaultResultId ? (respKey.get(quiz.defaultResultId) ?? null) : null,
-      banner: quiz.bannerMediaId && files.some((f) => f.id === quiz.bannerMediaId) ? { image: quiz.bannerMediaId, alt: quiz.bannerAlt ?? "" } : null,
+      banner:
+        quiz.bannerMediaId && files.some((f) => f.id === quiz.bannerMediaId)
+          ? { image: quiz.bannerMediaId, alt: quiz.bannerAlt ?? "", altTranslations: quiz.bannerAltTranslations }
+          : null,
+      languages: quiz.languages,
+      translations: trOf("quiz", 0),
     },
     categories: cats.map((c) => ({
       key: catKey.get(c.id)!,
@@ -218,6 +254,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       color: c.color,
       importance: c.importance,
       description: c.description,
+      translations: trOf("category", c.id),
     })),
     questions: qs.map((q) => ({
       title: q.title,
@@ -230,7 +267,13 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       part: q.part,
       answers: ans
         .filter((a) => a.questionId === q.id)
-        .map((a) => ({ label: a.label, bodyHtml: a.bodyHtml, weights: weightsOf(aw.filter((w) => w.answerId === a.id)) })),
+        .map((a) => ({
+          label: a.label,
+          bodyHtml: a.bodyHtml,
+          weights: weightsOf(aw.filter((w) => w.answerId === a.id)),
+          translations: trOf("answer", a.id),
+        })),
+      translations: trOf("question", q.id),
     })),
     responses: rs.map((r) => ({
       key: respKey.get(r.id)!,
@@ -240,6 +283,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       ctaUrl: r.ctaUrl,
       ctaLabel: r.ctaLabel,
       weights: weightsOf(rw.filter((w) => w.resultId === r.id)),
+      translations: trOf("response", r.id),
     })),
     images: Object.fromEntries(
       files.map((f) => [f.id, { contentType: f.contentType, filename: f.filename, data: Buffer.from(f.bytes).toString("base64") }]),
@@ -248,6 +292,10 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
 }
 
 /* --------------------------------- Import -------------------------------- */
+
+/** Only the languages this app supports (besides English). */
+const pickLocales = (map: Record<string, string>) =>
+  Object.fromEntries(Object.entries(map).filter(([l, t]) => isLocale(l) && l !== DEFAULT_LOCALE && t.trim()));
 
 /** Parses an uploaded file, with messages people can act on. */
 export function parseQuizFile(text: string): QuizFile {
@@ -352,9 +400,26 @@ export async function importQuiz(
         customCss: relink(css.data!) ?? "",
         bannerMediaId: banner || null,
         bannerAlt: banner ? file.quiz.banner!.alt : null,
+        bannerAltTranslations: banner ? pickLocales(file.quiz.banner!.altTranslations) : {},
+        languages: EXTRA_LOCALES.filter((l) => file.quiz.languages.includes(l)),
         createdBy: opts.createdBy,
       })
       .returning({ id: quizzes.id });
+
+    // Translations, matched to the new ids once each item exists.
+    const trRows: (typeof translations.$inferInsert)[] = [];
+    const addTr = (kind: TranslationKind, id: number, english: Record<string, string | null>, given: Record<string, Record<string, string>>) => {
+      for (const [locale, fields] of Object.entries(given)) {
+        if (!isLocale(locale) || locale === DEFAULT_LOCALE) continue;
+        for (const [field, raw] of Object.entries(fields)) {
+          const source = english[field];
+          if (!source || !(field in english)) continue;
+          const text = field.endsWith("Html") ? rich(raw) : raw.replace(/\s+/g, " ").trim();
+          if (text) trRows.push({ quizId: quiz.id, locale, key: translationKey(kind, id, field), text, sourceHash: hashText(source) });
+        }
+      }
+    };
+    addTr("quiz", 0, { title: (opts.title ?? file.quiz.title).slice(0, 120), introHtml: rich(file.quiz.introHtml) }, file.quiz.translations);
 
     const catIds = new Map<string, number>();
     for (const [i, c] of cats.entries()) {
@@ -363,6 +428,7 @@ export async function importQuiz(
         .values({ quizId: quiz.id, name: c.name, abbr: c.abbr, color: c.color, importance: c.importance, description: c.description, position: i })
         .returning({ id: categories.id });
       catIds.set(c.key, row.id);
+      addTr("category", row.id, { name: c.name }, c.translations);
     }
     const weightRows = (w: Record<string, number>) =>
       Object.entries(w)
@@ -386,11 +452,13 @@ export async function importQuiz(
           position: i,
         })
         .returning({ id: questions.id });
+      addTr("question", row.id, { title: q.title, helpHtml: rich(q.helpHtml) }, q.translations);
       for (const [j, a] of q.answers.entries()) {
         const [answer] = await tx
           .insert(answers)
           .values({ questionId: row.id, label: a.label, bodyHtml: rich(a.bodyHtml), position: j })
           .returning({ id: answers.id });
+        addTr("answer", answer.id, { label: a.label, bodyHtml: rich(a.bodyHtml) }, a.translations);
         const w = q.part === "scored" ? weightRows(a.weights) : []; // only scored questions carry weights
         if (w.length) await tx.insert(answerWeights).values(w.map((x) => ({ ...x, answerId: answer.id })));
       }
@@ -411,9 +479,16 @@ export async function importQuiz(
         })
         .returning({ id: results.id });
       respIds.set(r.key, row.id);
+      addTr(
+        "response",
+        row.id,
+        { title: r.title, excerpt: r.excerpt, bodyHtml: rich(r.bodyHtml), ctaLabel: r.ctaLabel },
+        r.translations,
+      );
       const w = weightRows(r.weights);
       if (w.length) await tx.insert(resultWeights).values(w.map((x) => ({ ...x, resultId: row.id })));
     }
+    if (trRows.length) await tx.insert(translations).values(trRows);
     if (file.quiz.defaultResponse) {
       await tx.update(quizzes).set({ defaultResultId: respIds.get(file.quiz.defaultResponse) ?? null }).where(eq(quizzes.id, quiz.id));
     }
