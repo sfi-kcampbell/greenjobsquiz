@@ -43,6 +43,13 @@
       "when": 1791497874181,
       "tag": "0005_quiz_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791994184809,
+      "tag": "0006_quiz_versions",
+      "breakpoints": true
     }
   ]
 }

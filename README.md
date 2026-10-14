@@ -26,6 +26,7 @@ A personality-style quiz that recommends a response, such as a green career. The
 - **Share cards**: shared result links show a branded image card (best match, % match, top three categories) in link previews on social media, iMessage, Slack and Teams, and **Download image** saves it. The API returns its address as `shareImageUrl`.
 
 - **Help**: an FAQ with step-by-step how-tos for staff at `/admin/help` (linked in the admin menu and on the Dashboard). Super Admin how-tos are grouped in one Super Admin section, hidden from Admins. The content lives in `src/app/admin/help/faq.tsx`; update it when a button or section name changes.
+- **Drafts and versions**: edits are a draft until **Publish changes**; the public site serves published versions only, and people part-way through finish on the version they started. Quiz settings shows what's unpublished, keeps a version history, and can restore any version to the draft. See "Drafts and versions" below.
 
 See the build order in SPEC.md for what comes next.
 
@@ -205,3 +206,14 @@ Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`
 - Like the share page, the card is never cached or indexed, and turning off a share link turns off its card too.
 - Headless front ends get its address as `shareImageUrl` in submit and result responses.
 - The card uses Geist (SIL Open Font License; `assets/fonts`).
+
+## Drafts and versions
+
+- **Drafts:** changes to a quiz's title, introduction, categories, questions, answers, responses, weights and scoring settings are a draft. The builder shows **Unpublished changes (n)**, and quiz settings → Publishing lists them. Try the draft in the Simulate tab.
+- **Publish changes** saves the draft as the next numbered version (with an optional note) and makes it live. **Discard changes** puts the draft back to the live version.
+- **Live straight away (no publish needed):** URL slug, banner, CSS, delivery and layout, respondent options (progress bar, auto-advance, retakes), require-a-code and quiz codes.
+- **People part-way through** finish on the version they started (their questions and scoring don't change under them); new attempts get the latest version. Each submission records its version.
+- **Shared results** show response text from the latest published version, never from an unpublished draft.
+- **Versions** (quiz settings): number, date, who, note, how many finished on each, **View** (read-only, compared with the draft) and **Restore to draft** (then publish to make it live). Restoring brings back deleted questions, answers and responses with their original ids, and archives rather than deletes anything with submissions.
+- **API:** `GET /api/v1/quizzes/{id}` serves the latest version (`quiz.version`); `?version=N` serves an older one, for attempts still on it. The session response includes `version`.
+- Quizzes published before versions existed get version 1 automatically the first time they're loaded.

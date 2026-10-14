@@ -144,10 +144,13 @@ export async function readBody<T extends z.ZodType>(req: NextRequest, schema: T)
   return parsed.data;
 }
 
-export async function loadPublishedQuiz(idParam: string): Promise<PublicQuiz> {
+/** The latest published version, or `version` (an older one an attempt is still on). */
+export async function loadPublishedQuiz(idParam: string, version?: string | null): Promise<PublicQuiz> {
   const id = z.coerce.number().int().positive().safeParse(idParam);
   if (!id.success) throw notFound();
-  const quiz = await getPublishedQuiz(db, { id: id.data });
+  const v = version ? z.coerce.number().int().positive().safeParse(version) : null;
+  if (v && !v.success) throw notFound();
+  const quiz = await getPublishedQuiz(db, { id: id.data }, { version: v?.data });
   if (!quiz) throw notFound();
   return quiz;
 }

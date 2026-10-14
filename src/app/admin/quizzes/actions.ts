@@ -29,6 +29,7 @@ import { recordAudit } from "@/lib/audit";
 import { codeDatesInput, codeInput } from "@/lib/content/quiz-code-rules";
 import { createCode, resetReportLink, setCodeArchived, setRequireCode, updateCode } from "@/lib/content/quiz-codes";
 import { duplicateQuiz } from "@/lib/content/quiz-file";
+import { publishVersion, restoreToDraft } from "@/lib/content/versions";
 import { db } from "@/lib/db/client";
 import { quizzes } from "@/lib/db/schema";
 import { expireQuizPages } from "@/lib/public/page-cache";
@@ -161,19 +162,50 @@ export async function updateDeliveryAction(
   return { ok: true, message: "Delivery settings saved." };
 }
 
-export async function setQuizStatusAction(quizId: number, status: "draft" | "published"): Promise<FormState> {
+export async function setQuizStatusAction(quizId: number, status: "draft" | "published", note?: string): Promise<FormState> {
   const staff = await requireStaff();
   const id = idSchema.parse(quizId);
   if (status !== "draft" && status !== "published") return { error: "Unknown status." };
+  let message: string;
   try {
-    await setQuizStatus(db, id, status);
-    await recordAudit(db, staff, { scope: "quiz", action: status === "published" ? "quiz.publish" : "quiz.unpublish", quizId: id, summary: status === "published" ? "Published the quiz" : "Unpublished the quiz" });
+    if (status === "published") {
+      // Freeze the working copy as a version first, so the public site has one to serve.
+      const { version, created } = await publishVersion(db, id, staff.email, typeof note === "string" ? note : null);
+      await setQuizStatus(db, id, "published");
+      await recordAudit(db, staff, {
+        scope: "quiz",
+        action: "quiz.publish",
+        quizId: id,
+        summary: created ? `Published version ${version.number}` : `Published the quiz (version ${version.number}, unchanged)`,
+        details: { version: version.number, note: version.note },
+      });
+      message = created ? `Published version ${version.number}.` : "Published.";
+    } else {
+      await setQuizStatus(db, id, "draft");
+      await recordAudit(db, staff, { scope: "quiz", action: "quiz.unpublish", quizId: id, summary: "Unpublished the quiz" });
+      message = "Unpublished.";
+    }
   } catch (error) {
     return failure(error);
   }
   expireQuizPages();
   revalidatePath("/admin/quizzes", "layout");
-  return { ok: true, message: status === "published" ? "Published." : "Unpublished." };
+  return { ok: true, message };
+}
+
+/** Makes the draft match a published version again (Discard changes / Restore). */
+export async function restoreVersionAction(quizId: number, number: number): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  const n = idSchema.parse(number);
+  try {
+    await restoreToDraft(db, id, n);
+    await recordAudit(db, staff, { scope: "quiz", action: "quiz.restore", quizId: id, summary: `Restored the draft to version ${n}`, details: { version: n } });
+  } catch (error) {
+    return failure(error);
+  }
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: `The draft now matches version ${n}. Publish to make it live.` };
 }
 
 export async function updateBannerAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {

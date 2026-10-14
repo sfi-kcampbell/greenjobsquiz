@@ -28,11 +28,13 @@ const quiz: PublicQuiz = {
   banner: null,
   layout: "stepped",
   settings: { allowSkip: false, showProgress: true, retakeAllowed: true, autoAdvance: false, runnersUpCount: 2, requireCode: false },
+  version: 1,
   structureVersion: 1,
   questions: [question(1), question(2, { required: false }), question(3)],
 };
 
 const session = (extra: Partial<SessionResponse> = {}): SessionResponse => ({
+  version: 1,
   status: "none",
   attemptNo: null,
   revision: 0,

@@ -122,7 +122,9 @@ export function quizApi(quizId: number, identity: Identity | null = null, getCod
   };
   return {
     // The structure may come from the HTTP cache (ETag); nothing else may. It's the same for everyone.
-    structure: () => call<{ quiz: PublicQuiz }>(base, { cache: "default" }).then((r) => r.quiz),
+    /** `version`: an older published version (for an attempt that started on it). */
+    structure: (version?: number) =>
+      call<{ quiz: PublicQuiz }>(version ? `${base}?version=${version}` : base, { cache: "default" }).then((r) => r.quiz),
     session: () => send<SessionResponse>(`${base}/session`),
     saveAnswer: (body: { questionId: number; answerIds: number[]; clientRevision?: number; currentIndex?: number }) =>
       send<SaveResponse>(`${base}/session/answer`, { method: "PUT", body: JSON.stringify(withCode(body)) }).then((res) => {
