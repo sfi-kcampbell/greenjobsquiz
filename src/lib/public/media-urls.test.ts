@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/client", () => ({ db: {} }));
 
-const { absolutizeMedia } = await import("./http");
+const { absolutizeMedia, resultLinks } = await import("./http");
+const { NextRequest } = await import("next/server");
 
 describe("absolutizeMedia", () => {
   const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -25,5 +26,17 @@ describe("absolutizeMedia", () => {
     const body = { a: 1 };
     expect(absolutizeMedia(body, "https://x")).toBe(body);
     expect(absolutizeMedia(null, "https://x")).toBeNull();
+  });
+});
+
+describe("resultLinks", () => {
+  it("includes the share card image, absolute from the request", () => {
+    const saved = process.env.APP_URL;
+    delete process.env.APP_URL;
+    const token = "a".repeat(32);
+    const links = resultLinks(new NextRequest("https://preview.example.org/api/v1/quizzes/1/submit"), token);
+    expect(links.shareImageUrl).toBe(`https://preview.example.org/quiz-result/${token}/card`);
+    expect(links.shareUrl).toBe(`https://preview.example.org/quiz-result/${token}`);
+    if (saved !== undefined) process.env.APP_URL = saved;
   });
 });

@@ -7,7 +7,7 @@ import type { PublicQuiz } from "@/lib/public/structure";
 
 export type Answers = Record<string, number[]>;
 
-export type ResultLinks = { shareUrl: string; printUrl: string; resultApiUrl: string };
+export type ResultLinks = { shareUrl: string; printUrl: string; resultApiUrl: string; shareImageUrl: string };
 
 export type SessionResponse = Omit<SessionView, "result"> & {
   result: (NonNullable<SessionView["result"]> & ResultLinks) | null;

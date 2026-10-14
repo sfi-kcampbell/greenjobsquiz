@@ -236,5 +236,7 @@ export function resultLinks(req: NextRequest, shareToken: string) {
     shareUrl: `${base}/quiz-result/${shareToken}`,
     printUrl: `${base}/quiz-result/${shareToken}?autoprint=1`,
     resultApiUrl: `${base}/api/v1/results/${shareToken}`,
+    /** The 1200×630 share card (PNG). */
+    shareImageUrl: `${base}/quiz-result/${shareToken}/card`,
   };
 }
