@@ -81,7 +81,13 @@ export async function deleteQuizAction(quizId: number, _prev: FormState): Promis
     await deleteQuiz(db, id);
     await recordAudit(db, staff, { scope: "quiz", action: "quiz.delete", quizTitle: before?.title ?? null, summary: `Deleted the quiz “${before?.title ?? id}”` });
   } catch (error) {
-    return failure(error);
+    try {
+      return failure(error);
+    } catch {
+      // Anything unexpected: keep the page and say so, rather than crashing it.
+      console.error(`[quizzes] Deleting quiz ${id} failed:`, error);
+      return { error: "The quiz couldn't be deleted. Please try again." };
+    }
   }
   expireQuizPages();
   revalidatePath("/admin/quizzes");
