@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef } from "react";
+import { LOCALE_NAMES_EN, type Locale } from "@/lib/i18n/locales";
 
 type Option = { id: number; title: string };
 
@@ -16,7 +17,7 @@ export function Filters({
   responseOptions,
   codeOptions,
 }: {
-  values: { quiz?: number; response?: number; code?: number; from?: string; to?: string; q?: string; sort: string; dir: string; per: number };
+  values: { quiz?: number; response?: number; code?: number; lang?: string; from?: string; to?: string; q?: string; sort: string; dir: string; per: number };
   quizOptions: Option[];
   responseOptions: Option[];
   codeOptions: Option[];
@@ -88,6 +89,19 @@ export function Filters({
           </select>
         </div>
       )}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="f-lang" className="font-medium">
+          Language
+        </label>
+        <select id="f-lang" name="lang" defaultValue={values.lang ?? ""} className={field}>
+          <option value="">Any language</option>
+          {(Object.keys(LOCALE_NAMES_EN) as Locale[]).map((l) => (
+            <option key={l} value={l}>
+              {LOCALE_NAMES_EN[l]}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="f-from" className="font-medium">
           From

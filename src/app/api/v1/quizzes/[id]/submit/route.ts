@@ -26,7 +26,7 @@ const body = z.object({
 
 /** Scores the current attempt on the server and stores it. Idempotent. */
 export const POST = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/submit">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const input = await readBody(req, body);
   const identity = identify(req);
   await checkWriteOrigin(req, identity);
@@ -38,7 +38,7 @@ export const POST = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/qu
     ipHash: await clientIpHash(),
     referrer: req.headers.get("referer"),
   });
-  const result = await getResultByShareToken(db, done.shareToken);
+  const result = await getResultByShareToken(db, done.shareToken, { locale: quiz.locale });
   return respond(
     req,
     { shareToken: done.shareToken, ...resultLinks(req, done.shareToken), alreadySubmitted: done.alreadySubmitted, result },

@@ -11,7 +11,7 @@ const body = z.object({ code: z.string().max(40).optional() });
 
 /** Starts a new attempt. Earlier attempts and submissions are kept. */
 export const POST = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/session/restart">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const identity = identify(req);
   await checkWriteOrigin(req, identity);
   await rateLimit("restart", identity.tokenHash);

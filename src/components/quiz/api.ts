@@ -112,10 +112,14 @@ async function call<T>(path: string, init: RequestInit = {}, identity?: Identity
 
 export type CodeCheck = { valid: true; code: string } | { valid: false; reason: string; message: string; opensAt: string | null };
 
-/** `getCode`: the quiz code for this visit, sent when an attempt starts. */
-export function quizApi(quizId: number, identity: Identity | null = null, getCode: () => string | null = () => null) {
+/**
+ * `getCode`: the quiz code for this visit, sent when an attempt starts.
+ * `locale`: the respondent's language; quiz requests carry it as ?lang=.
+ */
+export function quizApi(quizId: number, identity: Identity | null = null, getCode: () => string | null = () => null, locale = "en") {
   const base = `/quizzes/${quizId}`;
-  const send = <T,>(path: string, init: RequestInit = {}) => call<T>(path, init, identity);
+  const lang = (path: string) => `${path}${path.includes("?") ? "&" : "?"}lang=${encodeURIComponent(locale)}`;
+  const send = <T,>(path: string, init: RequestInit = {}) => call<T>(path.startsWith(base) ? lang(path) : path, init, identity);
   const withCode = <B extends object>(body: B) => {
     const code = getCode();
     return code ? { ...body, code } : body;
@@ -124,7 +128,7 @@ export function quizApi(quizId: number, identity: Identity | null = null, getCod
     // The structure may come from the HTTP cache (ETag); nothing else may. It's the same for everyone.
     /** `version`: an older published version (for an attempt that started on it). */
     structure: (version?: number) =>
-      call<{ quiz: PublicQuiz }>(version ? `${base}?version=${version}` : base, { cache: "default" }).then((r) => r.quiz),
+      call<{ quiz: PublicQuiz }>(lang(version ? `${base}?version=${version}` : base), { cache: "default" }).then((r) => r.quiz),
     session: () => send<SessionResponse>(`${base}/session`),
     saveAnswer: (body: { questionId: number; answerIds: number[]; clientRevision?: number; currentIndex?: number }) =>
       send<SaveResponse>(`${base}/session/answer`, { method: "PUT", body: JSON.stringify(withCode(body)) }).then((res) => {
@@ -138,6 +142,6 @@ export function quizApi(quizId: number, identity: Identity | null = null, getCod
     followUp: (answers: { questionId: number; answerIds: number[] }[]) =>
       send<{ followUp: Answers }>(`${base}/follow-up`, { method: "POST", body: JSON.stringify({ answers }) }).then((r) => r.followUp),
     attempts: () => send<{ attempts: Attempt[] }>(`${base}/attempts`).then((r) => r.attempts),
-    result: (token: string) => send<ResultLinks & { result: ResultPayload }>(`/results/${encodeURIComponent(token)}`),
+    result: (token: string) => send<ResultLinks & { result: ResultPayload }>(lang(`/results/${encodeURIComponent(token)}`)),
   };
 }

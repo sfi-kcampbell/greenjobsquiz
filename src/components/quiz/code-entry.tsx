@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useMessages } from "./i18n";
 
 /** "Quiz code" box shown instead of Start when a quiz needs a code. */
 export function CodeEntry({
@@ -11,6 +12,7 @@ export function CodeEntry({
   check: (code: string) => Promise<string | null>;
   initialError?: string | null;
 }) {
+  const m = useMessages();
   const id = useId();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,17 +23,17 @@ export function CodeEntry({
       className="flex flex-col gap-2"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!value.trim()) return setError("Enter your quiz code.");
+        if (!value.trim()) return setError(m.enterCode);
         setBusy(true);
         setError(await check(value.trim()));
         setBusy(false);
       }}
     >
       <label htmlFor={id} className="font-medium">
-        Quiz code
+        {m.codeLabel}
       </label>
       <p id={`${id}-hint`} className="text-sm text-muted">
-        This quiz needs a code. You&apos;ll find it on your mailer, flyer or from your teacher.
+        {m.codeHint}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <input
@@ -51,7 +53,7 @@ export function CodeEntry({
           disabled={busy}
           className="pltq-button pltq-button--primary rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
-          {busy ? "Checking…" : "Continue"}
+          {busy ? m.checking : m.continue}
         </button>
       </div>
       {error && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useMessages } from "./i18n";
 
 /** "You're 3 of 10 through." Resume or start a new attempt. */
 export function ResumeView({
@@ -18,6 +19,7 @@ export function ResumeView({
   onResume: () => void;
   onStartOver: () => void;
 }) {
+  const m = useMessages();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -26,11 +28,9 @@ export function ResumeView({
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-6">
       <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold focus:outline-none">
-        Welcome back
+        {m.welcomeBack}
       </h2>
-      <p>
-        You&apos;re {answered} of {total} through. Pick up where you left off, or start again.
-      </p>
+      <p>{m.resumeProgress(answered, total)}</p>
       {error && (
         <p role="alert" className="pltq-error font-medium text-danger">
           {error}
@@ -43,7 +43,7 @@ export function ResumeView({
           disabled={busy}
           className="pltq-button pltq-button--primary rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
-          Resume
+          {m.resume}
         </button>
         <button
           type="button"
@@ -51,7 +51,7 @@ export function ResumeView({
           disabled={busy}
           className="pltq-button rounded-md border border-border px-6 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
         >
-          {busy ? "Starting over…" : "Start over"}
+          {busy ? m.startingOver : m.startOver}
         </button>
       </div>
     </div>

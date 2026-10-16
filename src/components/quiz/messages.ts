@@ -1,26 +1,34 @@
 /**
- * What respondents are told when a request fails. A network failure is
- * "check your connection"; a server failure is ours, never theirs.
+ * What respondents are told when a request fails, in their language. A
+ * network failure is "check your connection"; a server failure is ours,
+ * never theirs. Known API error codes use the catalog's wording; anything
+ * else shows the server's (English) message.
  */
+import { messagesFor, type Messages } from "@/lib/i18n";
 import { ApiError } from "./api";
 
-const NETWORK = "We couldn't reach the server. Check your connection and try again.";
-const SERVER = "Something went wrong on our side. Please try again in a moment.";
+const EN = messagesFor("en");
 
-export function errorMessage(error: unknown): string {
-  if (!(error instanceof ApiError)) return SERVER;
-  if (error.status === 0) return NETWORK;
-  if (error.status >= 500) return SERVER;
-  return error.message;
+function apiMessage(error: ApiError, m: Messages): string {
+  if (error.code === "quiz_code_invalid") {
+    const reason = error.details?.reason;
+    if (reason === "not_open_yet") return m.codeNotOpenYet;
+    if (reason === "closed") return m.codeClosed;
+    return m.codeNotFound;
+  }
+  return m.errors[error.code] ?? error.message;
+}
+
+export function errorMessage(error: unknown, m: Messages = EN): string {
+  if (!(error instanceof ApiError)) return m.serverError;
+  if (error.status === 0) return m.networkError;
+  if (error.status >= 500) return m.serverError;
+  return apiMessage(error, m);
 }
 
 /** For the banner and submit after an answer couldn't be saved. */
-export function saveErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.status === 0) {
-    return "We couldn't save your last answer. Check your connection.";
-  }
-  if (!(error instanceof ApiError) || error.status >= 500) {
-    return "We couldn't save your last answer because of a problem on our side. Your answers are kept on this page.";
-  }
-  return error.message;
+export function saveErrorMessage(error: unknown, m: Messages = EN): string {
+  if (error instanceof ApiError && error.status === 0) return m.saveNetworkError;
+  if (!(error instanceof ApiError) || error.status >= 500) return m.saveServerError;
+  return apiMessage(error, m);
 }

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { translationStatus } from "@/lib/content/translations";
+import { readWorkingContent } from "@/lib/content/versions";
+import { db } from "@/lib/db/client";
+import { EXTRA_LOCALES, LOCALE_NAMES_EN } from "@/lib/i18n/locales";
 import { healthReport, type HealthTarget } from "@/lib/scoring/health";
 import { loadBundle, loadQuiz } from "../../load";
 
@@ -17,6 +21,9 @@ export default async function HealthPage({ params }: PageProps<"/admin/quizzes/[
   const notes = problems.filter((c) => c.severity === "info");
   const passed = report.checks.filter((c) => c.items.length === 0);
   const maxBar = Math.max(1, ...report.balance.map((b) => b.max));
+  // Offered languages with untranslated or out-of-date text (shown in English meanwhile).
+  const status = quiz.languages.length ? await translationStatus(db, quiz.id, await readWorkingContent(db, quiz.id)) : {};
+  const gaps = EXTRA_LOCALES.filter((l) => quiz.languages.includes(l) && (status[l].done < status[l].total || status[l].stale > 0));
 
   return (
     <section aria-labelledby="health-heading" className="flex flex-col gap-6">
@@ -38,6 +45,24 @@ export default async function HealthPage({ params }: PageProps<"/admin/quizzes/[
         <CheckList title="Needs attention" checks={warnings} href={href} tone="warning" />
       )}
       {notes.length > 0 && <CheckList title="Worth a look" checks={notes} href={href} tone="info" />}
+
+      {gaps.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 text-sm">
+          <h3 className="font-semibold">Translations</h3>
+          <p className="text-muted">Untranslated text shows in English, so these don&apos;t affect results.</p>
+          <ul className="flex flex-col gap-1">
+            {gaps.map((l) => (
+              <li key={l}>
+                {LOCALE_NAMES_EN[l]}: {status[l].done} of {status[l].total} texts translated
+                {status[l].stale > 0 && `, ${status[l].stale} need${status[l].stale === 1 ? "s" : ""} review`}.{" "}
+                <Link href={`${base}/translations?lang=${l}`} className="text-brand underline underline-offset-4">
+                  Translate<span className="sr-only"> into {LOCALE_NAMES_EN[l]}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
         <h3 className="font-semibold">Category balance</h3>

@@ -127,6 +127,46 @@ export const FAQ: FaqSection[] = [
         ),
       },
       {
+        id: "languages",
+        question: "How do I offer the quiz in Spanish or French?",
+        answer: (
+          <Steps>
+            <li>
+              Open the builder → <Ui>Translations</Ui>, pick the language and translate each text next to its English.
+              Click <Ui>Save translations</Ui> for each section. Anything left empty shows in English.
+            </li>
+            <li>
+              In quiz settings → <Ui>Languages</Ui>, tick the language and click <Ui>Save languages</Ui>. Add the
+              banner&apos;s alt text in that language too.
+            </li>
+            <li>
+              Click <Ui>Publish changes</Ui>: translations are part of the draft, like any content change.
+            </li>
+            <li>
+              Respondents get their browser&apos;s language when the quiz offers it, and can switch with the
+              <Ui> Language</Ui> menu at the top of the quiz. To link to a language, add <code>?lang=es</code> or{" "}
+              <code>?lang=fr</code> to the quiz&apos;s address (or its embed frame).
+            </li>
+            <li>
+              If you change the English later, the translation is marked <Ui>Needs review</Ui> until you update it
+              or click <Ui>Mark as reviewed</Ui>.
+            </li>
+          </Steps>
+        ),
+      },
+      {
+        id: "languages-scoring",
+        question: "Does the language change the result?",
+        answer: (
+          <p>
+            No. Every language has the same questions, answers and weights, so the same answers give the same result.
+            Submissions record the language they were taken in (a <Ui>Language</Ui> filter and CSV column), and
+            store question and answer text in English so reports compare like with like. Buttons and messages are
+            translated by the developers; ask them to add another language.
+          </p>
+        ),
+      },
+      {
         id: "reorder",
         question: "How do I change the order of questions, answers or categories?",
         answer: (

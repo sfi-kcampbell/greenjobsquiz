@@ -9,6 +9,7 @@ import type { Database, Executor } from "@/lib/db/create";
 import { answers as answersTable, questions, quizCodes, quizSessions, quizzes, results, submissions } from "@/lib/db/schema";
 import { hashToken, shareTokenFor } from "@/lib/public/tokens";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
+import { LOCALES, type Locale } from "@/lib/i18n/locales";
 import { toPercentage } from "@/lib/scoring/engine";
 
 /* --------------------------------- Query --------------------------------- */
@@ -30,6 +31,8 @@ export const submissionListQuery = z.object({
   quiz: optionalId,
   response: optionalId,
   code: optionalId,
+  /** The language the quiz was taken in. */
+  lang: z.enum(Object.keys(LOCALES) as [Locale, ...Locale[]]).optional().catch(undefined),
   from: isoDay,
   to: isoDay,
   q: z
@@ -121,6 +124,7 @@ export async function filters(db: Executor, query: SubmissionListQuery): Promise
       if (owned) conditions.push(eq(submissions.codeId, query.code));
     }
   }
+  if (query.lang) conditions.push(eq(submissions.locale, query.lang));
   if (query.from) conditions.push(gte(submissions.createdAt, new Date(`${query.from}T00:00:00Z`)));
   if (query.to) {
     const end = new Date(`${query.to}T00:00:00Z`);
@@ -273,6 +277,7 @@ export async function getSubmissionDetail(db: Executor, id: number) {
     referrer: s.referrer,
     ipHashShort: s.ipHash ? s.ipHash.slice(0, 12) : null,
     engineVersion: s.engineVersion,
+    locale: s.locale,
     suspect: s.suspect,
     status: scores.status,
     isClose: scores.isClose,

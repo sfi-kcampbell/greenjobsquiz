@@ -29,6 +29,8 @@ import { recordAudit } from "@/lib/audit";
 import { codeDatesInput, codeInput } from "@/lib/content/quiz-code-rules";
 import { createCode, resetReportLink, setCodeArchived, setRequireCode, updateCode } from "@/lib/content/quiz-codes";
 import { duplicateQuiz } from "@/lib/content/quiz-file";
+import { setQuizLanguages } from "@/lib/content/translations";
+import { LOCALE_NAMES_EN, type Locale } from "@/lib/i18n/locales";
 import { publishVersion, restoreToDraft } from "@/lib/content/versions";
 import { db } from "@/lib/db/client";
 import { quizzes } from "@/lib/db/schema";
@@ -345,4 +347,24 @@ export async function resetReportLinkAction(quizId: number, codeId: number): Pro
   }
   revalidatePath("/admin/quizzes", "layout");
   return { ok: true, message: "New teacher link made. The old link no longer works." };
+}
+
+export async function setLanguagesAction(quizId: number, _prev: FormState, formData: FormData): Promise<FormState> {
+  const staff = await requireStaff();
+  const id = idSchema.parse(quizId);
+  const wanted = formData.getAll("languages").map(String);
+  const alts = Object.fromEntries(
+    [...formData.entries()].filter(([k]) => k.startsWith("bannerAlt.")).map(([k, v]) => [k.slice("bannerAlt.".length), String(v)]),
+  );
+  const offered = await setQuizLanguages(db, id, wanted, alts);
+  const names = offered.map((l) => LOCALE_NAMES_EN[l as Locale]);
+  await recordAudit(db, staff, {
+    scope: "quiz",
+    action: "quiz.languages",
+    quizId: id,
+    summary: names.length ? `Offered the quiz in English and ${names.join(", ")}` : "Offered the quiz in English only",
+  });
+  expireQuizPages();
+  revalidatePath("/admin/quizzes", "layout");
+  return { ok: true, message: names.length ? `Offered in English, ${names.join(", ")}.` : "Offered in English only." };
 }

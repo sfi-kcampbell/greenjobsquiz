@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** Progress for the current respondent. Creates nothing (crawlers make no rows). */
 export const GET = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/session">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const view = await getSessionView(db, quiz, identify(req).tokenHash);
   return respond(req, {
     ...view,

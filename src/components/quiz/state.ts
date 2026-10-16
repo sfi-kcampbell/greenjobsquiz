@@ -3,6 +3,7 @@
  * browser: loading → intro | resume → question(i) → review → submitting →
  * result, plus error.
  */
+import { messagesFor, type Messages } from "@/lib/i18n";
 import type { ResultPayload } from "@/lib/public/sessions";
 import type { PublicQuestion, PublicQuiz } from "@/lib/public/structure";
 import type { Answers, Attempt, SessionResponse } from "./api";
@@ -71,6 +72,8 @@ export const initialState: QuizState = {
   followUpSent: {},
 };
 
+const EN = messagesFor("en");
+
 export const picked = (answers: Answers, questionId: number) => answers[String(questionId)] ?? [];
 
 /** Where a returning respondent picks up: the first unanswered question, else the last one. */
@@ -80,21 +83,19 @@ export function resumeIndex(quiz: PublicQuiz, answers: Answers): number {
 }
 
 /** Why this selection can't move on yet, or null if it can. */
-export function selectionProblem(question: PublicQuestion, answerIds: number[]): string | null {
+export function selectionProblem(question: PublicQuestion, answerIds: number[], m: Messages = EN): string | null {
   const count = answerIds.length;
-  if (count === 0) return question.required ? "Choose an answer to continue." : null;
+  if (count === 0) return question.required ? m.chooseAnswer : null;
   if (question.type === "single") return null;
-  if (count < question.minSelect) {
-    return `Choose at least ${question.minSelect} answers. You've chosen ${count}.`;
-  }
-  if (count > question.maxSelect) return overLimit(question, count);
+  if (count < question.minSelect) return m.chooseAtLeast(question.minSelect, count);
+  if (count > question.maxSelect) return overLimit(question, count, m);
   return null;
 }
 
 /** Shown as soon as a multi-select goes over its maximum (nothing is ever disabled). */
-export function overLimit(question: PublicQuestion, count: number): string | null {
+export function overLimit(question: PublicQuestion, count: number, m: Messages = EN): string | null {
   if (question.type !== "multi" || count <= question.maxSelect) return null;
-  return `You can choose up to ${question.maxSelect}. Untick ${count - question.maxSelect} to continue.`;
+  return m.chooseUpTo(question.maxSelect, count - question.maxSelect);
 }
 
 /** True when the server will accept this selection (empty clears the question). */
@@ -107,8 +108,9 @@ export function isSavable(question: PublicQuestion, answerIds: number[]): boolea
 
 /** The first question that would stop a submit, with its message. */
 export function firstProblem(quiz: PublicQuiz, answers: Answers): { index: number; message: string } | null {
+  const m = messagesFor(quiz.locale);
   for (const [index, q] of quiz.questions.entries()) {
-    const message = selectionProblem(q, picked(answers, q.id));
+    const message = selectionProblem(q, picked(answers, q.id), m);
     if (message) return { index, message };
   }
   return null;
@@ -127,7 +129,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
     case "loaded": {
       const { quiz, session, result } = action;
       const base = { ...initialState, quiz, revision: session.revision, answers: session.answers };
-      if (!quiz.questions.length) return { ...base, phase: "error", error: "This quiz has no questions yet." };
+      if (!quiz.questions.length) return { ...base, phase: "error", error: messagesFor(quiz.locale).noQuestions };
       if (session.status === "completed" && result) {
         return { ...base, phase: "result", result, shareToken: session.result?.shareToken ?? null, followUpSent: session.result?.followUp ?? {} };
       }

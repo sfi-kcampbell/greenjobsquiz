@@ -140,7 +140,11 @@ export function EmbedSnippet({ origin, slug, title }: { origin: string; slug: st
           {copied ? "Copied." : ""}
         </p>
       </div>
-      <p className="text-muted">The frame resizes to fit the quiz. Which sites may embed it is set in Settings.</p>
+      <p className="text-muted">
+        The frame resizes to fit the quiz. Which sites may embed it is set in Settings. To show the quiz in another
+        language it offers, add <code>?lang=es</code> (Spanish) or <code>?lang=fr</code> (French) to the frame&apos;s
+        address; otherwise it follows the visitor&apos;s browser.
+      </p>
     </div>
   );
 }

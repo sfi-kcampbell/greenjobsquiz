@@ -146,6 +146,10 @@ export const quizzes = pgTable(
     customCss: text().notNull().default(""),
     /** Only people with a quiz code can start an attempt. */
     requireCode: boolean().notNull().default(false),
+    /** Languages offered besides English (locale codes such as "es"). */
+    languages: text().array().notNull().default(sql`'{}'::text[]`),
+    /** The banner's alt text in other languages ({ es: "…" }). */
+    bannerAltTranslations: jsonb().$type<Record<string, string>>().notNull().default({}),
     structureVersion: integer().notNull().default(1),
 
     createdBy: text(),
@@ -304,6 +308,8 @@ export const quizSessions = pgTable(
     codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
     /** The published version the attempt started on (null: before versions existed → latest). */
     versionId: integer().references((): AnyPgColumn => quizVersions.id, { onDelete: "set null" }),
+    /** The language the respondent is using ("en", "es", …). */
+    locale: text().notNull().default("en"),
     ipHash: char({ length: 64 }),
     startedAt: createdAt(),
     updatedAt: updatedAt(),
@@ -343,6 +349,8 @@ export const submissions = pgTable(
     codeId: integer().references((): AnyPgColumn => quizCodes.id, { onDelete: "set null" }),
     versionId: integer().references((): AnyPgColumn => quizVersions.id, { onDelete: "set null" }),
     shareExpiresAt: timestamp({ withTimezone: true }),
+    /** The language the quiz was taken in (snapshots stay in English). */
+    locale: text().notNull().default("en"),
     email: text(),
     questionsAnswered: smallint().notNull().default(0),
     durationSeconds: integer(),
@@ -512,4 +520,25 @@ export const quizVersions = pgTable(
     note: text(),
   },
   (t) => [uniqueIndex("quiz_versions_quiz_number").on(t.quizId, t.number)],
+);
+
+/**
+ * Admins' translations of quiz content (the working copy; published with
+ * versions). `key` is "kind:id:field", e.g. "question:12:title" ("quiz:0:title"
+ * for the quiz itself). `sourceHash` is the English text's hash when it was
+ * translated, so the editor can flag translations whose English changed.
+ */
+export const translations = pgTable(
+  "translations",
+  {
+    quizId: integer()
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    locale: text().notNull(),
+    key: text().notNull(),
+    text: text().notNull(),
+    sourceHash: char({ length: 16 }).notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.quizId, t.locale, t.key] })],
 );

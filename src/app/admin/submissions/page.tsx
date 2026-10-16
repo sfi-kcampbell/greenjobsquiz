@@ -33,6 +33,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
     quiz: query.quiz,
     response: query.response,
     code: query.code,
+    lang: query.lang,
     from: query.from,
     to: query.to,
     q: query.q,
@@ -70,7 +71,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
     time: duration(r.durationSeconds),
     suspect: r.suspect,
   }));
-  const filtered = Boolean(query.quiz || query.from || query.to || query.q);
+  const filtered = Boolean(query.quiz || query.lang || query.from || query.to || query.q);
   const first = total === 0 ? 0 : (page - 1) * per + 1;
   const last = Math.min(total, page * per);
 
@@ -79,7 +80,7 @@ export default async function SubmissionsPage({ searchParams }: PageProps<"/admi
       <h1 className="text-2xl font-semibold">Submissions</h1>
       <Filters
         key={here} // remount on navigation so the inputs show the URL's values
-        values={{ quiz: query.quiz, response: query.response, code: query.code, from: query.from, to: query.to, q: query.q, sort: query.sort, dir: query.dir, per: query.per }}
+        values={{ quiz: query.quiz, response: query.response, code: query.code, lang: query.lang, from: query.from, to: query.to, q: query.q, sort: query.sort, dir: query.dir, per: query.per }}
         quizOptions={quizOptions}
         responseOptions={responseOptions}
         codeOptions={codeOptions}

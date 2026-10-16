@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** The current respondent's submitted attempts at this quiz. */
 export const GET = route(async (req: NextRequest, ctx: RouteContext<"/api/v1/quizzes/[id]/attempts">) => {
-  const quiz = await loadPublishedQuiz((await ctx.params).id);
+  const quiz = await loadPublishedQuiz((await ctx.params).id, req);
   const attempts = await listAttempts(db, quiz.id, identify(req).tokenHash);
   return respond(req, {
     attempts: attempts.map((a) => ({ ...a, ...(a.shareToken ? resultLinks(req, a.shareToken) : {}) })),

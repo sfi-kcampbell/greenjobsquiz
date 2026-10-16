@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { PublicQuiz } from "@/lib/public/structure";
 import type { Answers } from "./api";
 import { picked, selectionProblem } from "./state";
+import { useMessages } from "./i18n";
 
 /** Every question with the chosen answers, before submitting. */
 export function ReviewView({
@@ -23,6 +24,7 @@ export function ReviewView({
   onBack: () => void;
   onSubmit: () => void;
 }) {
+  const m = useMessages();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -31,25 +33,25 @@ export function ReviewView({
   return (
     <div className="pltq-review flex flex-col gap-6">
       <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold focus:outline-none sm:text-2xl">
-        Check your answers
+        {m.checkYourAnswers}
       </h2>
       <ol className="flex flex-col gap-3">
         {quiz.questions.map((q, index) => {
           const ids = picked(answers, q.id);
           const labels = q.answers.filter((a) => ids.includes(a.id)).map((a) => a.label);
-          const problem = selectionProblem(q, ids);
+          const problem = selectionProblem(q, ids, m);
           return (
             <li
               key={q.id}
               className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-surface px-4 py-3 ${problem ? "border-danger" : "border-border"}`}
             >
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="text-sm text-muted">Question {index + 1}</span>
+                <span className="text-sm text-muted">{m.questionNumber(index + 1)}</span>
                 <span className="font-medium">{q.title}</span>
                 {labels.length > 0 ? (
                   <span>{labels.join(", ")}</span>
                 ) : (
-                  <span className="text-muted italic">Not answered</span>
+                  <span className="text-muted italic">{m.notAnswered}</span>
                 )}
                 {problem && <span className="text-sm font-medium text-danger">{problem}</span>}
               </div>
@@ -59,7 +61,8 @@ export function ReviewView({
                 disabled={busy}
                 className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-border/40 disabled:opacity-60"
               >
-                Change<span className="sr-only"> answer to question {index + 1}</span>
+                {m.change}
+                <span className="sr-only">{m.changeAnswerTo(index + 1)}</span>
               </button>
             </li>
           );
@@ -77,7 +80,7 @@ export function ReviewView({
           disabled={busy}
           className="pltq-button rounded-md border border-border bg-surface px-5 py-2.5 font-medium hover:bg-border/40 disabled:opacity-60"
         >
-          Back
+          {m.back}
         </button>
         <button
           type="button"
@@ -85,7 +88,7 @@ export function ReviewView({
           disabled={busy}
           className="pltq-button pltq-button--primary ml-auto rounded-md border border-transparent bg-brand px-6 py-2.5 font-medium text-white hover:bg-brand-strong disabled:opacity-60"
         >
-          {busy ? "Working out your result…" : "See my result"}
+          {busy ? m.workingOut : m.seeMyResult}
         </button>
       </div>
     </div>

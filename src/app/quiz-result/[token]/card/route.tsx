@@ -58,7 +58,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/quiz-result/[tok
             {banner && <div style={{ fontSize: 28, color: "#5b6b60", marginBottom: 8 }}>{card.quizTitle}</div>}
             <div style={{ fontSize: 34, color: "#5b6b60", textTransform: "uppercase", letterSpacing: 2 }}>{card.lead}</div>
             <div style={{ fontSize: card.title.length > 28 ? 56 : 76, fontWeight: 700, lineHeight: 1.05, marginTop: 6 }}>{card.title}</div>
-            {card.percent !== null && <div style={{ fontSize: 44, fontWeight: 700, color: BRAND, marginTop: 14 }}>{`${card.percent}% match`}</div>}
+            {card.percentText !== null && <div style={{ fontSize: 44, fontWeight: 700, color: BRAND, marginTop: 14 }}>{card.percentText}</div>}
           </div>
           {card.categories.length > 0 && (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 22 }}>

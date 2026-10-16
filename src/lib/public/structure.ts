@@ -6,7 +6,9 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getVersion, getVersionById, latestVersion, type VersionRow } from "@/lib/content/versions";
 import type { Executor } from "@/lib/db/create";
+import { localizeContent } from "@/lib/content/localize";
 import { media, quizzes } from "@/lib/db/schema";
+import { offeredLocales, pickLocale, type Locale } from "@/lib/i18n/locales";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 
 /** Off-site links in what respondents see open in a new tab. */
@@ -52,7 +54,14 @@ export type PublicQuiz = {
   questions: PublicQuestion[];
   /** Follow-up questions, shown under the result (never scored). */
   followUp: PublicQuestion[];
+  /** The language this copy is in (untranslated text falls back to English). */
+  locale: Locale;
+  /** The languages the quiz offers, English first. */
+  languages: Locale[];
 };
+
+/** Which language to serve: `locale` (?lang=) if offered, else the browser's, else English. */
+export type LocaleRequest = { locale?: string | null; acceptLanguage?: string | null };
 
 /** Published quizzes (the API lists all; pages pass `hostedOnly` to skip headless ones). */
 export async function listPublishedQuizzes(db: Executor, opts: { hostedOnly?: boolean } = {}) {
@@ -90,8 +99,8 @@ export async function getQuizBranding(db: Executor, quizId: number): Promise<{ b
 }
 
 /** What the hosted and embed pages need: the public quiz plus how it's delivered. */
-export async function getPublishedQuizPage(db: Executor, slug: string): Promise<QuizPageInfo | null> {
-  const quiz = await getPublishedQuiz(db, { slug });
+export async function getPublishedQuizPage(db: Executor, slug: string, locale?: string | null): Promise<QuizPageInfo | null> {
+  const quiz = await getPublishedQuiz(db, { slug }, { locale });
   if (!quiz) return null;
   const [row] = await db
     .select({
@@ -127,14 +136,17 @@ function toPublicQuestion(q: VersionRow["content"]["questions"][number]): Public
  * respondent options). Explicit field picks: weights are dropped here and
  * must never be added.
  */
-async function publicFromVersion(db: Executor, quiz: QuizRow, version: VersionRow): Promise<PublicQuiz> {
-  const c = version.content;
+async function publicFromVersion(db: Executor, quiz: QuizRow, version: VersionRow, want: LocaleRequest = {}): Promise<PublicQuiz> {
+  const languages = offeredLocales(quiz.languages);
+  const locale = pickLocale(want.locale, want.acceptLanguage, languages);
+  const c = localizeContent(version.content, locale);
+  const bannerAlt = (locale !== "en" && quiz.bannerAltTranslations?.[locale]) || quiz.bannerAlt;
   return {
     id: quiz.id,
     slug: quiz.slug,
     title: c.title,
     introHtml: sanitizeRichText(c.introHtml, PUBLIC),
-    banner: await bannerFor(db, quiz.bannerMediaId, quiz.bannerAlt),
+    banner: await bannerFor(db, quiz.bannerMediaId, bannerAlt),
     layout: quiz.layout,
     settings: {
       allowSkip: quiz.allowSkip,
@@ -149,6 +161,8 @@ async function publicFromVersion(db: Executor, quiz: QuizRow, version: VersionRo
     // "Before" questions first (stable within each part), then scored; follow-ups apart.
     questions: [...c.questions.filter((q) => q.part === "pre"), ...c.questions.filter((q) => q.part === "scored")].map(toPublicQuestion),
     followUp: c.questions.filter((q) => q.part === "post").map(toPublicQuestion),
+    locale,
+    languages,
   };
 }
 
@@ -159,7 +173,7 @@ async function publicFromVersion(db: Executor, quiz: QuizRow, version: VersionRo
 export async function getPublishedQuiz(
   db: Executor,
   ref: { id: number } | { slug: string },
-  opts: { version?: number } = {},
+  opts: { version?: number } & LocaleRequest = {},
 ): Promise<PublicQuiz | null> {
   const where = "id" in ref ? eq(quizzes.id, ref.id) : eq(quizzes.slug, ref.slug);
   const [quiz] = await db
@@ -169,13 +183,18 @@ export async function getPublishedQuiz(
     .limit(1);
   if (!quiz) return null;
   const version = opts.version ? await getVersion(db, quiz.id, opts.version) : await latestVersion(db, quiz.id);
-  return version ? publicFromVersion(db, quiz, version) : null;
+  return version ? publicFromVersion(db, quiz, version, opts) : null;
 }
 
 /** The quiz as of a particular version (for an attempt that started on it). */
-export async function getPublishedQuizAtVersionId(db: Executor, quizId: number, versionId: number): Promise<PublicQuiz | null> {
+export async function getPublishedQuizAtVersionId(
+  db: Executor,
+  quizId: number,
+  versionId: number,
+  want: LocaleRequest = {},
+): Promise<PublicQuiz | null> {
   const version = await getVersionById(db, versionId);
   if (!version || version.quizId !== quizId) return null;
   const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, quizId)).limit(1);
-  return quiz ? publicFromVersion(db, quiz, version) : null;
+  return quiz ? publicFromVersion(db, quiz, version, want) : null;
 }

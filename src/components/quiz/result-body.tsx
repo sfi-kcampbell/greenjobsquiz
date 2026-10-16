@@ -1,6 +1,7 @@
 import type { Ref } from "react";
 import type { ResultPayload } from "@/lib/public/sessions";
 import { RichHtml } from "./rich-html";
+import { messagesFor } from "@/lib/i18n";
 
 /**
  * The result itself: best match, runners-up and the category profile (every
@@ -8,13 +9,15 @@ import { RichHtml } from "./rich-html";
  * and the printable /quiz-result page share it.
  */
 export function ResultBody({ result, headingRef }: { result: ResultPayload; headingRef?: Ref<HTMLHeadingElement> }) {
+  // In the language the quiz was taken in.
+  const m = messagesFor(result.locale);
   const { match } = result;
   const scores = Object.entries(result.scores).sort((a, b) => b[1].percent - a[1].percent);
 
   return (
     <>
       <section aria-labelledby="result-title" className="pltq-response flex flex-col gap-4 rounded-xl border border-border bg-surface p-6">
-        <p className="text-sm font-medium uppercase tracking-wide text-muted">Your best match</p>
+        <p className="text-sm font-medium uppercase tracking-wide text-muted">{m.bestMatch}</p>
         {match ? (
           <>
             <h2 id="result-title" ref={headingRef} tabIndex={-1} className="pltq-response-title text-3xl font-semibold focus:outline-none">
@@ -22,14 +25,14 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
             </h2>
             {match.percent !== null && !result.isFallback && (
               <p className="text-lg">
-                <strong className="text-brand">{match.percent}% match</strong>
+                <strong className="text-brand">{m.percentMatch(match.percent)}</strong>
               </p>
             )}
             {result.isClose && (
-              <p className="text-muted">It was close: your next match scored almost the same, so take a look below too.</p>
+              <p className="text-muted">{m.itWasClose}</p>
             )}
             {result.status === "insufficient_data" && (
-              <p className="text-muted">Your answers didn&apos;t point clearly to one match, so here&apos;s a good place to start.</p>
+              <p className="text-muted">{m.insufficientData}</p>
             )}
             <RichHtml html={match.bodyHtml} />
             {!match.bodyHtml && match.excerpt && <p>{match.excerpt}</p>}
@@ -42,14 +45,14 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
                   className="pltq-cta inline-block rounded-md border border-transparent bg-brand px-5 py-2.5 font-medium text-white hover:bg-brand-strong"
                 >
                   {match.ctaLabel}
-                  <span className="sr-only"> (opens in a new tab)</span>
+                  <span className="sr-only">{m.opensInNewTab}</span>
                 </a>
               </p>
             )}
           </>
         ) : (
           <h2 id="result-title" ref={headingRef} tabIndex={-1} className="text-2xl font-semibold focus:outline-none">
-            We couldn&apos;t find a match from your answers.
+            {m.noMatchFound}
           </h2>
         )}
       </section>
@@ -57,14 +60,14 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
       {result.runnersUp.length > 0 && (
         <section aria-labelledby="runners-up" className="pltq-runners-up flex flex-col gap-3">
           <h3 id="runners-up" className="text-lg font-semibold">
-            Also a good fit
+            {m.alsoAGoodFit}
           </h3>
           <ul className="flex flex-col gap-3">
             {result.runnersUp.map((r) => (
               <li key={r.resultId} className="rounded-lg border border-border bg-surface p-4">
                 <p className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-semibold">{r.title}</span>
-                  <span className="text-sm text-muted tabular-nums">{r.percent}% match</span>
+                  <span className="text-sm text-muted tabular-nums">{m.percentMatch(r.percent)}</span>
                 </p>
                 {r.excerpt && <p className="mt-1 text-muted">{r.excerpt}</p>}
               </li>
@@ -76,7 +79,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
       {scores.length > 0 && (
         <section aria-labelledby="profile" className="pltq-profile flex flex-col gap-3">
           <h3 id="profile" className="text-lg font-semibold">
-            Your profile
+            {m.yourProfile}
           </h3>
           <ul className="flex flex-col gap-3">
             {scores.map(([id, s]) => (
