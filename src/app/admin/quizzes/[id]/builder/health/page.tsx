@@ -22,7 +22,10 @@ export default async function HealthPage({ params }: PageProps<"/admin/quizzes/[
   const passed = report.checks.filter((c) => c.items.length === 0);
   const maxBar = Math.max(1, ...report.balance.map((b) => b.max));
   // Offered languages with untranslated or out-of-date text (shown in English meanwhile).
-  const status = quiz.languages.length ? await translationStatus(db, quiz.id, await readWorkingContent(db, quiz.id)) : {};
+  const draft = await readWorkingContent(db, quiz.id);
+  const status = quiz.languages.length ? await translationStatus(db, quiz.id, draft) : {};
+  // Only worth a mention once the quiz uses sub-responses at all.
+  const withoutSubs = draft.subResponses.length ? draft.responses.filter((r) => r.subResponseIds.length === 0) : [];
   const gaps = EXTRA_LOCALES.filter((l) => quiz.languages.includes(l) && (status[l].done < status[l].total || status[l].stale > 0));
 
   return (
@@ -45,6 +48,22 @@ export default async function HealthPage({ params }: PageProps<"/admin/quizzes/[
         <CheckList title="Needs attention" checks={warnings} href={href} tone="warning" />
       )}
       {notes.length > 0 && <CheckList title="Worth a look" checks={notes} href={href} tone="info" />}
+
+      {withoutSubs.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 text-sm">
+          <h3 className="font-semibold">Responses with no sub-responses</h3>
+          <p className="text-muted">These responses don&apos;t list any sub-responses yet (that may be on purpose).</p>
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            {withoutSubs.map((r) => (
+              <li key={r.id}>
+                <Link href={`${base}/responses/${r.id}`} className="text-brand underline underline-offset-4">
+                  {r.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {gaps.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4 text-sm">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { localizeContent } from "@/lib/content/localize";
+import { subResponsesFor } from "@/lib/content/sub-response-list";
 import { bundleFromContent, readWorkingContent } from "@/lib/content/versions";
 import { db } from "@/lib/db/client";
 import { EXTRA_LOCALES, isLocale, LOCALE_NAMES_EN, type Locale } from "@/lib/i18n/locales";
@@ -15,7 +16,9 @@ export default async function SimulatePage({ params, searchParams }: PageProps<"
   // Preview the text in another language (scoring is the same in every language).
   const asked = (await searchParams).lang;
   const locale: Locale = isLocale(asked) ? asked : "en";
-  const display = locale === "en" ? bundle.display : bundleFromContent(localizeContent(await readWorkingContent(db, quiz.id), locale)).display;
+  const content = localizeContent(await readWorkingContent(db, quiz.id), locale);
+  const display = locale === "en" ? bundle.display : bundleFromContent(content).display;
+  const subResponses = Object.fromEntries(content.responses.map((r) => [r.id, subResponsesFor(content, r.id)]));
 
   return (
     <section aria-labelledby="simulate-heading" className="flex flex-col gap-4">
@@ -47,6 +50,8 @@ export default async function SimulatePage({ params, searchParams }: PageProps<"
         model={bundle.model}
         display={display}
         runnersUpCount={bundle.settings.runnersUpCount}
+        subResponses={subResponses}
+        subResponseLimit={content.scoring.subResponseLimit}
       />
     </section>
   );

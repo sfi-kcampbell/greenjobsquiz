@@ -8,7 +8,7 @@
  */
 import type { QuizContent } from "./versions";
 
-export type TranslationKind = "quiz" | "category" | "question" | "answer" | "response";
+export type TranslationKind = "quiz" | "category" | "question" | "answer" | "response" | "group" | "subresponse";
 /** locale → key → text. */
 export type Translations = Record<string, Record<string, string>>;
 
@@ -53,6 +53,14 @@ export function sourceFields(content: QuizContent): SourceField[] {
     add("response", r.id, group, "bodyHtml", "Description", r.bodyHtml, true, 50_000);
     add("response", r.id, group, "ctaLabel", "Button label", r.ctaLabel, false, 60);
   }
+  for (const g of content.groups ?? []) {
+    const group = `Sub-responses: ${g.name}`;
+    add("group", g.id, group, "name", "Group name", g.name, false, 60);
+    for (const x of (content.subResponses ?? []).filter((x) => x.groupId === g.id)) {
+      add("subresponse", x.id, group, "title", `“${x.title}”`, x.title, false, 120);
+      add("subresponse", x.id, group, "description", `Text for “${x.title}”`, x.description, false, 500);
+    }
+  }
   return out;
 }
 
@@ -90,6 +98,12 @@ export function localizeContent(content: QuizContent, locale: string | null | un
       excerpt: tr("response", r.id, "excerpt", r.excerpt),
       bodyHtml: tr("response", r.id, "bodyHtml", r.bodyHtml),
       ctaLabel: tr("response", r.id, "ctaLabel", r.ctaLabel),
+    })),
+    groups: (content.groups ?? []).map((g) => ({ ...g, name: tr("group", g.id, "name", g.name) })),
+    subResponses: (content.subResponses ?? []).map((x) => ({
+      ...x,
+      title: tr("subresponse", x.id, "title", x.title),
+      description: tr("subresponse", x.id, "description", x.description),
     })),
   };
 }

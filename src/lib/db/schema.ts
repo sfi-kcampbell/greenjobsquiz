@@ -127,6 +127,8 @@ export const quizzes = pgTable(
     scoringMethod: text().$type<"cosine" | "weighted_sum">().notNull().default("cosine"),
     normalizePerCategory: boolean().notNull().default(true),
     runnersUpCount: smallint().notNull().default(2),
+    /** Sub-responses each runner-up shows, per group (the best match shows all). */
+    subResponseLimit: smallint().notNull().default(3),
     layout: text().$type<"stepped" | "single_page">().notNull().default("stepped"),
     allowSkip: boolean().notNull().default(false),
     showProgress: boolean().notNull().default(true),
@@ -158,6 +160,7 @@ export const quizzes = pgTable(
   },
   (t) => [
     check("quizzes_runners_up_range", sql`${t.runnersUpCount} between 0 and 5`),
+    check("quizzes_sub_response_limit_range", sql`${t.subResponseLimit} between 0 and 20`),
     check("quizzes_status_valid", sql`${t.status} in ('draft', 'published')`),
   ],
 );
@@ -541,4 +544,55 @@ export const translations = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [primaryKey({ columns: [t.quizId, t.locale, t.key] })],
+);
+
+/** Groups of sub-responses (e.g. "Jobs"); shown as headings under a response. */
+export const subResponseGroups = pgTable(
+  "sub_response_groups",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    quizId: integer()
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    position: integer().notNull().default(0),
+  },
+  (t) => [uniqueIndex("sub_response_groups_quiz_name").on(t.quizId, sql`lower(${t.name})`)],
+);
+
+/**
+ * Items listed under responses (e.g. jobs under a personality type), set up
+ * once and attached to any number of responses.
+ */
+export const subResponses = pgTable(
+  "sub_responses",
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    quizId: integer()
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    groupId: integer()
+      .notNull()
+      .references(() => subResponseGroups.id, { onDelete: "restrict" }),
+    title: text().notNull(),
+    description: text(),
+    url: text(),
+    position: integer().notNull().default(0),
+  },
+  (t) => [index("sub_responses_quiz_group").on(t.quizId, t.groupId, t.position)],
+);
+
+/** Which sub-responses a response lists, in its own order (many-to-many). */
+export const resultSubResponses = pgTable(
+  "result_sub_responses",
+  {
+    resultId: integer()
+      .notNull()
+      .references(() => results.id, { onDelete: "cascade" }),
+    subResponseId: integer()
+      .notNull()
+      .references(() => subResponses.id, { onDelete: "cascade" }),
+    position: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.resultId, t.subResponseId] }), index("result_sub_responses_item").on(t.subResponseId)],
 );

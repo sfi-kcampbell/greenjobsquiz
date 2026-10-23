@@ -11,12 +11,26 @@
 import { and, asc, eq, inArray, isNull, like } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Executor } from "@/lib/db/create";
-import { answers, answerWeights, categories, media, questions, quizzes, results, resultWeights, translations } from "@/lib/db/schema";
+import {
+  answers,
+  answerWeights,
+  categories,
+  media,
+  questions,
+  quizzes,
+  results,
+  resultSubResponses,
+  resultWeights,
+  subResponseGroups,
+  subResponses,
+  translations,
+} from "@/lib/db/schema";
 import { DEFAULT_LOCALE, EXTRA_LOCALES, isLocale } from "@/lib/i18n/locales";
 import { MediaError, mediaUrl, storeMedia } from "@/lib/media/media";
 import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError } from "./errors";
 import { translationKey, type TranslationKind } from "./localize";
+import { listGroups, listSubResponses } from "./sub-responses";
 import { hashText } from "./translations";
 import {
   categoryInput,
@@ -24,11 +38,15 @@ import {
   MAX_ANSWERS,
   MAX_QUESTIONS,
   MAX_RESPONSES,
+  MAX_SUB_RESPONSE_GROUPS,
+  MAX_SUB_RESPONSES,
+  MAX_SUB_RESPONSES_PER_RESPONSE,
   quizDeliveryInput,
   responseDetailsInput,
   SLUG_MAX,
   SLUG_PATTERN,
   slugify,
+  subResponseInput,
 } from "./validation";
 
 export const QUIZ_FILE_FORMAT = "pltq-quiz";
@@ -65,6 +83,7 @@ const fileSchema = z
       scoringMethod: z.enum(["cosine", "weighted_sum"]),
       normalizePerCategory: z.boolean(),
       runnersUpCount: z.number().int().min(0).max(5),
+      subResponseLimit: z.number().int().min(0).max(20).default(3),
       layout: z.enum(["stepped", "single_page"]),
       layoutTemplate: z.enum(["default", "canvas"]),
       deliveryMode: z.enum(["hosted", "headless"]),
@@ -125,10 +144,29 @@ const fileSchema = z
           ctaUrl: z.string().nullable(),
           ctaLabel: z.string().nullable(),
           weights,
+          /** Keys of the sub-responses it lists, in order. */
+          subResponses: z.array(key).max(MAX_SUB_RESPONSES_PER_RESPONSE).default([]),
           translations: itemTranslations,
         }),
       )
       .max(MAX_RESPONSES),
+    subResponseGroups: z
+      .array(z.object({ key, name: z.string().trim().min(1).max(60), translations: itemTranslations }))
+      .max(MAX_SUB_RESPONSE_GROUPS)
+      .default([]),
+    subResponses: z
+      .array(
+        z.object({
+          key,
+          group: key,
+          title: z.string().trim().min(1).max(120),
+          description: z.string().max(500).nullable(),
+          url: z.string().max(2000).nullable(),
+          translations: itemTranslations,
+        }),
+      )
+      .max(MAX_SUB_RESPONSES)
+      .default([]),
     images: z
       .record(
         z.string(),
@@ -150,6 +188,17 @@ const fileSchema = z
     const badWeight = [...f.questions.flatMap((q) => q.answers.map((a) => a.weights)), ...f.responses.map((r) => r.weights)]
       .some((w) => Object.keys(w).some((k) => !catKeys.has(k)));
     if (badWeight) ctx.addIssue({ code: "custom", path: ["categories"], message: "A weight refers to a category that isn't in the file." });
+    unique(f.subResponseGroups.map((g) => g.key), "groups", "subResponseGroups");
+    unique(f.subResponseGroups.map((g) => g.name), "groups", "subResponseGroups");
+    unique(f.subResponses.map((x) => x.key), "sub-responses", "subResponses");
+    const groupKeys = new Set(f.subResponseGroups.map((g) => g.key));
+    if (f.subResponses.some((x) => !groupKeys.has(x.group))) {
+      ctx.addIssue({ code: "custom", path: ["subResponses"], message: "A sub-response refers to a group that isn't in the file." });
+    }
+    const subKeys = new Set(f.subResponses.map((x) => x.key));
+    if (f.responses.some((r) => r.subResponses.some((k) => !subKeys.has(k)))) {
+      ctx.addIssue({ code: "custom", path: ["responses"], message: "A response lists a sub-response that isn't in the file." });
+    }
     if (f.quiz.defaultResponse && !f.responses.some((r) => r.key === f.quiz.defaultResponse)) {
       ctx.addIssue({ code: "custom", path: ["quiz"], message: "The fallback response isn't in the file." });
     }
@@ -197,6 +246,14 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
     return out;
   };
 
+  const groups = await listGroups(db, quizId);
+  const subs = await listSubResponses(db, quizId);
+  const subLinks = rs.length
+    ? await db.select().from(resultSubResponses).where(inArray(resultSubResponses.resultId, rs.map((r) => r.id))).orderBy(asc(resultSubResponses.position))
+    : [];
+  const groupKey = new Map(groups.map((g, i) => [g.id, `g${i + 1}`]));
+  const subKey = new Map(subs.map((x, i) => [x.id, `s${i + 1}`]));
+
   const catKey = new Map(cats.map((c, i) => [c.id, `c${i + 1}`]));
   const respKey = new Map(rs.map((r, i) => [r.id, `r${i + 1}`]));
   const weightsOf = (rows: { categoryId: number; weight: number }[]) =>
@@ -229,6 +286,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       scoringMethod: quiz.scoringMethod,
       normalizePerCategory: quiz.normalizePerCategory,
       runnersUpCount: quiz.runnersUpCount,
+      subResponseLimit: quiz.subResponseLimit,
       layout: quiz.layout,
       layoutTemplate: quiz.layoutTemplate,
       deliveryMode: quiz.deliveryMode,
@@ -283,7 +341,17 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       ctaUrl: r.ctaUrl,
       ctaLabel: r.ctaLabel,
       weights: weightsOf(rw.filter((w) => w.resultId === r.id)),
+      subResponses: subLinks.filter((l) => l.resultId === r.id && subKey.has(l.subResponseId)).map((l) => subKey.get(l.subResponseId)!),
       translations: trOf("response", r.id),
+    })),
+    subResponseGroups: groups.map((g) => ({ key: groupKey.get(g.id)!, name: g.name, translations: trOf("group", g.id) })),
+    subResponses: subs.map((x) => ({
+      key: subKey.get(x.id)!,
+      group: groupKey.get(x.groupId)!,
+      title: x.title,
+      description: x.description,
+      url: x.url,
+      translations: trOf("subresponse", x.id),
     })),
     images: Object.fromEntries(
       files.map((f) => [f.id, { contentType: f.contentType, filename: f.filename, data: Buffer.from(f.bytes).toString("base64") }]),
@@ -388,6 +456,7 @@ export async function importQuiz(
         scoringMethod: file.quiz.scoringMethod,
         normalizePerCategory: file.quiz.normalizePerCategory,
         runnersUpCount: file.quiz.runnersUpCount,
+        subResponseLimit: file.quiz.subResponseLimit,
         layout: delivery.data!.layout,
         layoutTemplate: delivery.data!.layoutTemplate,
         deliveryMode: delivery.data!.deliveryMode,
@@ -488,6 +557,30 @@ export async function importQuiz(
       const w = weightRows(r.weights);
       if (w.length) await tx.insert(resultWeights).values(w.map((x) => ({ ...x, resultId: row.id })));
     }
+    // Sub-responses: groups, items, then each response's list.
+    const groupIds = new Map<string, number>();
+    for (const [i, g] of file.subResponseGroups.entries()) {
+      const [row] = await tx.insert(subResponseGroups).values({ quizId: quiz.id, name: g.name, position: i }).returning({ id: subResponseGroups.id });
+      groupIds.set(g.key, row.id);
+      addTr("group", row.id, { name: g.name }, g.translations);
+    }
+    const subIds = new Map<string, number>();
+    for (const [i, x] of file.subResponses.entries()) {
+      const parsed = subResponseInput.safeParse({ id: null, groupId: groupIds.get(x.group), title: x.title, description: x.description ?? "", url: x.url ?? "" });
+      if (!parsed.success) fail(`sub-response "${x.title}": ${parsed.error.issues[0].message}`);
+      const v = parsed.data!;
+      const [row] = await tx
+        .insert(subResponses)
+        .values({ quizId: quiz.id, groupId: v.groupId, title: v.title, description: v.description, url: v.url, position: i })
+        .returning({ id: subResponses.id });
+      subIds.set(x.key, row.id);
+      addTr("subresponse", row.id, { title: v.title, description: v.description }, x.translations);
+    }
+    const links = responsesIn.flatMap((r) =>
+      [...new Set(r.subResponses)].map((k, position) => ({ resultId: respIds.get(r.key)!, subResponseId: subIds.get(k)!, position })),
+    );
+    if (links.length) await tx.insert(resultSubResponses).values(links);
+
     if (trRows.length) await tx.insert(translations).values(trRows);
     if (file.quiz.defaultResponse) {
       await tx.update(quizzes).set({ defaultResultId: respIds.get(file.quiz.defaultResponse) ?? null }).where(eq(quizzes.id, quiz.id));

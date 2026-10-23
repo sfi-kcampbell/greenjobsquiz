@@ -7,12 +7,14 @@ import { updateScoringAction } from "../actions";
 export function ScoringForm({
   quizId,
   runnersUpCount,
+  subResponseLimit,
   normalizePerCategory,
   defaultResultId,
   responses,
 }: {
   quizId: number;
   runnersUpCount: number;
+  subResponseLimit: number;
   normalizePerCategory: boolean;
   defaultResultId: number | null;
   responses: { id: number; title: string }[];
@@ -23,7 +25,7 @@ export function ScoringForm({
     // React resets the form after the action, and a <select> keeps the default it mounted with, so remount on
     // the saved values; otherwise the dropdowns snap back to what they showed when the page loaded.
     <form
-      key={`${runnersUpCount}-${normalizePerCategory}-${defaultResultId ?? ""}`}
+      key={`${runnersUpCount}-${subResponseLimit}-${normalizePerCategory}-${defaultResultId ?? ""}`}
       action={action}
       className="flex flex-col gap-4 text-sm"
     >
@@ -44,6 +46,30 @@ export function ScoringForm({
           ))}
         </select>
         {state.fieldErrors?.runnersUpCount && <p className="text-danger">{state.fieldErrors.runnersUpCount}</p>}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="subResponseLimit" className="font-medium">
+          Sub-responses shown for each runner-up, per group
+        </label>
+        <select
+          id="subResponseLimit"
+          name="subResponseLimit"
+          defaultValue={subResponseLimit}
+          aria-describedby="subResponseLimit-hint"
+          className="w-24 rounded-md border border-border bg-surface px-2 py-1.5"
+        >
+          {Array.from({ length: 21 }, (_, n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <p id="subResponseLimit-hint" className="max-w-2xl text-muted">
+          The best match always shows all of its sub-responses. Runners-up show up to this many from each group
+          (0 shows none).
+        </p>
+        {state.fieldErrors?.subResponseLimit && <p className="text-danger">{state.fieldErrors.subResponseLimit}</p>}
       </div>
 
       <div className="flex flex-col gap-1">

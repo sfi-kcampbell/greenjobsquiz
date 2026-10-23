@@ -167,6 +167,29 @@ export const FAQ: FaqSection[] = [
         ),
       },
       {
+        id: "sub-responses",
+        question: "How do I list jobs (or other items) under a response?",
+        answer: (
+          <Steps>
+            <li>
+              Open the builder → <Ui>Sub-responses</Ui>. Add a group (for example &ldquo;Jobs&rdquo;), then add items to
+              it, each with a title and, if you like, a short text and a link.
+            </li>
+            <li>
+              Open a response (builder → <Ui>Responses</Ui> → the response), tick its items under <Ui>Sub-responses</Ui>,
+              put them in order and click <Ui>Save sub-responses</Ui>. One item can be listed under several responses.
+            </li>
+            <li>
+              Respondents see them under their best match&apos;s description, a heading per group. Runners-up show a
+              few too: set how many per group in quiz settings → <Ui>Scoring</Ui>.
+            </li>
+            <li>
+              Click <Ui>Publish changes</Ui> to make them live. They can be translated in the <Ui>Translations</Ui> tab.
+            </li>
+          </Steps>
+        ),
+      },
+      {
         id: "reorder",
         question: "How do I change the order of questions, answers or categories?",
         answer: (

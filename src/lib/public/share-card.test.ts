@@ -10,7 +10,7 @@ const base: ResultPayload = {
   status: "scored",
   isClose: false,
   isFallback: false,
-  match: { resultId: 1, title: "Forester", bodyHtml: null, excerpt: "Work among trees.", ctaUrl: null, ctaLabel: null, percent: 86, raw: 0.9 },
+  match: { resultId: 1, title: "Forester", bodyHtml: null, excerpt: "Work among trees.", ctaUrl: null, ctaLabel: null, percent: 86, raw: 0.9, subResponses: [] },
   runnersUp: [],
   scores: {
     1: { raw: 1, normalized: 1, percent: 40, label: "Analytical", color: "#2f6690" },

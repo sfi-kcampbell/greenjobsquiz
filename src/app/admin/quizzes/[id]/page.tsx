@@ -205,6 +205,7 @@ export default async function QuizSettingsPage({ params }: PageProps<"/admin/qui
         <ScoringForm
           quizId={quiz.id}
           runnersUpCount={quiz.runnersUpCount}
+          subResponseLimit={quiz.subResponseLimit}
           normalizePerCategory={quiz.normalizePerCategory}
           defaultResultId={quiz.defaultResultId}
           responses={responses.map(({ id, title }) => ({ id, title }))}
