@@ -31,6 +31,8 @@ export function SubResponsesPanel({
   const [saved, setSaved] = useState(initialIds);
   const [ids, setIds] = useState(initialIds);
   const [filter, setFilter] = useState("");
+  // Open to start with when nothing is listed; after that the admin opens and closes it.
+  const [pickerOpen] = useState(initialIds.length === 0);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
   const byId = new Map(items.map((x) => [x.id, x]));
@@ -97,7 +99,7 @@ export function SubResponsesPanel({
         {ids.length === 0 && <p className="text-muted">None listed yet. Tick some below.</p>}
       </div>
 
-      <details className="rounded-md border border-border p-3" open={ids.length === 0}>
+      <details className="rounded-md border border-border p-3" open={pickerOpen}>
         <summary className="cursor-pointer font-medium">Add or remove sub-responses</summary>
         <div className="mt-3 flex flex-col gap-3">
           <div className="flex flex-col gap-1">
