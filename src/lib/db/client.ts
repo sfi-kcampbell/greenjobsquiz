@@ -2,6 +2,7 @@ import "server-only";
 import { attachDatabasePool } from "@vercel/functions";
 import { Pool } from "pg";
 import { createDb } from "./create";
+import { withSslMode } from "./url";
 
 /**
  * One pg Pool per server instance, against Neon's pooled connection string.
@@ -15,7 +16,7 @@ const globalForDb = globalThis as unknown as { pgPool?: Pool };
 const pool =
   globalForDb.pgPool ??
   new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: withSslMode(process.env.DATABASE_URL),
     max: 5,
     idleTimeoutMillis: 5_000,
   });
