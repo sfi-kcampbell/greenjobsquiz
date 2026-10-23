@@ -7,6 +7,7 @@
 import { and, asc, count, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import type { Database, Executor, Tx } from "@/lib/db/create";
 import { resultSubResponses, results, subResponseGroups, subResponses } from "@/lib/db/schema";
+import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { ContentError, pgError, PG_UNIQUE_VIOLATION } from "./errors";
 import { bumpStructureVersion, lockQuiz } from "./quizzes";
 import {
@@ -22,7 +23,7 @@ export type SubResponseView = {
   id: number;
   groupId: number;
   title: string;
-  description: string | null;
+  descriptionHtml: string | null;
   url: string | null;
   position: number;
   /** The responses that list it, in response order. */
@@ -55,7 +56,7 @@ export async function listSubResponses(db: Executor, quizId: number): Promise<Su
       id: r.id,
       groupId: r.groupId,
       title: r.title,
-      description: r.description,
+      descriptionHtml: r.descriptionHtml,
       url: r.url,
       position: r.position,
       usedBy: links.filter((l) => l.subResponseId === r.id).map(({ id, title }) => ({ id, title })),
@@ -140,7 +141,7 @@ export async function saveSubResponse(db: Database, quizId: number, input: SubRe
   return db.transaction(async (tx) => {
     await lockQuiz(tx, quizId);
     await assertGroup(tx, quizId, input.groupId);
-    const values = { groupId: input.groupId, title: input.title, description: input.description, url: input.url };
+    const values = { groupId: input.groupId, title: input.title, descriptionHtml: sanitizeRichText(input.descriptionHtml), url: input.url };
     let id: number;
     if (input.id === null) {
       const [{ n }] = await tx.select({ n: count() }).from(subResponses).where(eq(subResponses.quizId, quizId));

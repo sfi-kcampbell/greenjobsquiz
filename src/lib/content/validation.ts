@@ -264,11 +264,8 @@ export const subResponseInput = z.object({
   id: z.coerce.number().int().positive().nullable(),
   groupId: z.coerce.number().int().positive({ error: "Choose a group." }),
   title: z.string().trim().min(1, "Enter a title.").max(120, "Keep the title under 120 characters."),
-  description: z
-    .string()
-    .trim()
-    .max(500, "Keep the text under 500 characters.")
-    .transform((v) => v || null),
+  /** Rich text (sanitized when saved). */
+  descriptionHtml: richText,
   url: z
     .string()
     .trim()

@@ -160,7 +160,7 @@ const fileSchema = z
           key,
           group: key,
           title: z.string().trim().min(1).max(120),
-          description: z.string().max(500).nullable(),
+          descriptionHtml: html,
           url: z.string().max(2000).nullable(),
           translations: itemTranslations,
         }),
@@ -264,6 +264,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
     ...qs.map((q) => q.helpHtml),
     ...ans.map((a) => a.bodyHtml),
     ...rs.map((r) => r.bodyHtml),
+    ...subs.map((x) => x.descriptionHtml),
     quiz.customCss,
     ...trRows.map((r) => r.text),
   ]);
@@ -349,7 +350,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       key: subKey.get(x.id)!,
       group: groupKey.get(x.groupId)!,
       title: x.title,
-      description: x.description,
+      descriptionHtml: x.descriptionHtml,
       url: x.url,
       translations: trOf("subresponse", x.id),
     })),
@@ -566,15 +567,15 @@ export async function importQuiz(
     }
     const subIds = new Map<string, number>();
     for (const [i, x] of file.subResponses.entries()) {
-      const parsed = subResponseInput.safeParse({ id: null, groupId: groupIds.get(x.group), title: x.title, description: x.description ?? "", url: x.url ?? "" });
+      const parsed = subResponseInput.safeParse({ id: null, groupId: groupIds.get(x.group), title: x.title, descriptionHtml: rich(x.descriptionHtml), url: x.url ?? "" });
       if (!parsed.success) fail(`sub-response "${x.title}": ${parsed.error.issues[0].message}`);
       const v = parsed.data!;
       const [row] = await tx
         .insert(subResponses)
-        .values({ quizId: quiz.id, groupId: v.groupId, title: v.title, description: v.description, url: v.url, position: i })
+        .values({ quizId: quiz.id, groupId: v.groupId, title: v.title, descriptionHtml: v.descriptionHtml, url: v.url, position: i })
         .returning({ id: subResponses.id });
       subIds.set(x.key, row.id);
-      addTr("subresponse", row.id, { title: v.title, description: v.description }, x.translations);
+      addTr("subresponse", row.id, { title: v.title, descriptionHtml: v.descriptionHtml }, x.translations);
     }
     const links = responsesIn.flatMap((r) =>
       [...new Set(r.subResponses)].map((k, position) => ({ resultId: respIds.get(r.key)!, subResponseId: subIds.get(k)!, position })),

@@ -4,7 +4,7 @@
  */
 import type { QuizContent } from "./versions";
 
-export type SubResponseItem = { title: string; description: string | null; url: string | null };
+export type SubResponseItem = { title: string; descriptionHtml: string | null; url: string | null };
 export type SubResponseList = { group: string; items: SubResponseItem[] }[];
 
 /**
@@ -18,7 +18,7 @@ export function subResponsesFor(content: QuizContent, responseId: number, limit:
   const listed = response.subResponseIds.map((id) => byId.get(id)).filter((x) => x !== undefined);
   return (content.groups ?? [])
     .map((g) => {
-      const items = listed.filter((x) => x.groupId === g.id).map(({ title, description, url }) => ({ title, description, url }));
+      const items = listed.filter((x) => x.groupId === g.id).map(({ title, descriptionHtml, url }) => ({ title, descriptionHtml, url }));
       return { group: g.name, items: limit === null ? items : items.slice(0, limit) };
     })
     .filter((g) => g.items.length > 0);

@@ -58,7 +58,7 @@ export function sourceFields(content: QuizContent): SourceField[] {
     add("group", g.id, group, "name", "Group name", g.name, false, 60);
     for (const x of (content.subResponses ?? []).filter((x) => x.groupId === g.id)) {
       add("subresponse", x.id, group, "title", `“${x.title}”`, x.title, false, 120);
-      add("subresponse", x.id, group, "description", `Text for “${x.title}”`, x.description, false, 500);
+      add("subresponse", x.id, group, "descriptionHtml", `Text for “${x.title}”`, x.descriptionHtml, true, 10_000);
     }
   }
   return out;
@@ -103,7 +103,7 @@ export function localizeContent(content: QuizContent, locale: string | null | un
     subResponses: (content.subResponses ?? []).map((x) => ({
       ...x,
       title: tr("subresponse", x.id, "title", x.title),
-      description: tr("subresponse", x.id, "description", x.description),
+      descriptionHtml: tr("subresponse", x.id, "descriptionHtml", x.descriptionHtml),
     })),
   };
 }

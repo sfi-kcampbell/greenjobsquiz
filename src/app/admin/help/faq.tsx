@@ -173,7 +173,7 @@ export const FAQ: FaqSection[] = [
           <Steps>
             <li>
               Open the builder → <Ui>Sub-responses</Ui>. Add a group (for example &ldquo;Jobs&rdquo;), then add items to
-              it, each with a title and, if you like, a short text and a link.
+              it, each with a title and, if you like, some formatted text (with links or images) and a link.
             </li>
             <li>
               Open a response (builder → <Ui>Responses</Ui> → the response), tick its items under <Ui>Sub-responses</Ui>,

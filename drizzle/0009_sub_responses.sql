@@ -17,7 +17,7 @@ CREATE TABLE "sub_responses" (
 	"quiz_id" integer NOT NULL,
 	"group_id" integer NOT NULL,
 	"title" text NOT NULL,
-	"description" text,
+	"description_html" text,
 	"url" text,
 	"position" integer DEFAULT 0 NOT NULL
 );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import type { ActionResult } from "@/lib/content/action-result";
 import type { SubResponseGroupView, SubResponseView } from "@/lib/content/sub-responses";
 import {
@@ -17,13 +18,13 @@ import {
 const field = "w-full rounded-md border border-border bg-surface px-2 py-1.5";
 const smallButton = "rounded-md border border-border px-2.5 py-1 text-sm font-medium hover:bg-border/40 disabled:opacity-40";
 
-type Draft = { key: string; id: number | null; groupId: number; title: string; description: string; url: string };
+type Draft = { key: string; id: number | null; groupId: number; title: string; descriptionHtml: string; url: string };
 const toDraft = (x: SubResponseView): Draft => ({
   key: `s${x.id}`,
   id: x.id,
   groupId: x.groupId,
   title: x.title,
-  description: x.description ?? "",
+  descriptionHtml: x.descriptionHtml ?? "",
   url: x.url ?? "",
 });
 const move = <T,>(list: T[], from: number, to: number) => {
@@ -188,7 +189,7 @@ export function SubResponsesEditor({
             <div>
               <button
                 type="button"
-                onClick={() => setDrafts((ds) => [...ds, { key: `new-${Date.now()}`, id: null, groupId: g.id, title: "", description: "", url: "" }])}
+                onClick={() => setDrafts((ds) => [...ds, { key: `new-${Date.now()}`, id: null, groupId: g.id, title: "", descriptionHtml: "", url: "" }])}
                 className="text-sm font-medium text-brand underline underline-offset-4"
               >
                 + Add to {g.name}
@@ -316,21 +317,16 @@ function ItemCard({
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={id("description")} className="font-medium">
-            Text (optional)
-          </label>
-          <textarea
+        <div className="flex flex-col gap-1 md:col-span-2">
+          <span className="font-medium">Text (optional)</span>
+          <RichTextEditor
             id={id("description")}
-            value={draft.description}
-            maxLength={500}
-            rows={2}
-            onChange={(e) => set({ description: e.target.value })}
-            aria-invalid={errors.description ? true : undefined}
-            aria-describedby={errors.description ? id("description-error") : undefined}
-            className={field}
+            label={`Text for ${label}`}
+            value={draft.descriptionHtml}
+            onChange={(html) => set({ descriptionHtml: html })}
+            quizId={quizId}
           />
-          {err("description")}
+          {err("descriptionHtml")}
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor={id("url")} className="font-medium">

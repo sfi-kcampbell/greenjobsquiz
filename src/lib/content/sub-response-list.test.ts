@@ -28,10 +28,10 @@ const content: QuizContent = {
     { id: 9, name: "Empty", position: 2 },
   ],
   subResponses: [
-    { id: 10, groupId: 7, title: "DJ", description: "Music", url: "https://example.org/dj", position: 0 },
-    { id: 11, groupId: 7, title: "Sales", description: null, url: null, position: 1 },
-    { id: 12, groupId: 7, title: "Teacher", description: null, url: null, position: 2 },
-    { id: 20, groupId: 8, title: "Drama club", description: null, url: null, position: 0 },
+    { id: 10, groupId: 7, title: "DJ", descriptionHtml: "<p>Music</p>", url: "https://example.org/dj", position: 0 },
+    { id: 11, groupId: 7, title: "Sales", descriptionHtml: null, url: null, position: 1 },
+    { id: 12, groupId: 7, title: "Teacher", descriptionHtml: null, url: null, position: 2 },
+    { id: 20, groupId: 8, title: "Drama club", descriptionHtml: null, url: null, position: 0 },
   ],
   translations: { es: { "group:7:name": "Empleos", "subresponse:10:title": "Pinchadiscos" } },
 };
@@ -42,12 +42,12 @@ describe("subResponsesFor", () => {
       {
         group: "Jobs",
         items: [
-          { title: "Teacher", description: null, url: null },
-          { title: "DJ", description: "Music", url: "https://example.org/dj" },
-          { title: "Sales", description: null, url: null },
+          { title: "Teacher", descriptionHtml: null, url: null },
+          { title: "DJ", descriptionHtml: "<p>Music</p>", url: "https://example.org/dj" },
+          { title: "Sales", descriptionHtml: null, url: null },
         ],
       },
-      { group: "Clubs", items: [{ title: "Drama club", description: null, url: null }] },
+      { group: "Clubs", items: [{ title: "Drama club", descriptionHtml: null, url: null }] },
     ]);
   });
 
@@ -72,7 +72,7 @@ describe("subResponsesFor", () => {
     expect(sourceFields(content).filter((f) => f.kind === "group" || f.kind === "subresponse").map((f) => f.key)).toEqual([
       "group:7:name",
       "subresponse:10:title",
-      "subresponse:10:description",
+      "subresponse:10:descriptionHtml",
       "subresponse:11:title",
       "subresponse:12:title",
       "group:8:name",
@@ -88,7 +88,7 @@ describe("diffContent for sub-responses", () => {
     next.groups[0].name = "Careers";
     next.subResponses[0].title = "Radio DJ";
     next.subResponses = next.subResponses.filter((x) => x.id !== 20);
-    next.subResponses.push({ id: 30, groupId: 8, title: "Chess club", description: null, url: null, position: 1 });
+    next.subResponses.push({ id: 30, groupId: 8, title: "Chess club", descriptionHtml: null, url: null, position: 1 });
     next.responses[1].subResponseIds = [11, 12];
     next.scoring.subResponseLimit = 2;
     expect(diffContent(content, next)).toEqual([

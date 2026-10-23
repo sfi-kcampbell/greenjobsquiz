@@ -37,8 +37,8 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
   });
   afterAll(teardownTestDb);
 
-  const item = (groupId: number, title: string, extra: { description?: string; url?: string; id?: number } = {}) =>
-    saveSubResponse(db, quizId, subResponseInput.parse({ id: extra.id ?? null, groupId, title, description: extra.description ?? "", url: extra.url ?? "" }));
+  const item = (groupId: number, title: string, extra: { descriptionHtml?: string; url?: string; id?: number } = {}) =>
+    saveSubResponse(db, quizId, subResponseInput.parse({ id: extra.id ?? null, groupId, title, descriptionHtml: extra.descriptionHtml ?? null, url: extra.url ?? "" }));
 
   beforeEach(async () => {
     await resetTestDb();
@@ -69,7 +69,7 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
     analyst = await saveResponseRow(db, quizId, { id: null, title: "Analyst", weights: { [anly]: 5 } });
     jobs = await saveGroup(db, quizId, { id: null, name: "Jobs" });
     s = {
-      dj: await item(jobs, "DJ", { description: "Play music", url: "https://example.org/dj" }),
+      dj: await item(jobs, "DJ", { descriptionHtml: "<p>Play <strong>music</strong></p><script>x</script>", url: "https://example.org/dj" }),
       sales: await item(jobs, "Sales"),
       teacher: await item(jobs, "Teacher"),
       ranger: await item(jobs, "Ranger"),
@@ -83,10 +83,10 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
     await expect(deleteGroup(db, quizId, jobs)).rejects.toBeInstanceOf(ContentError);
     const clubs = await saveGroup(db, quizId, { id: null, name: "Clubs" });
     await deleteGroup(db, quizId, clubs);
-    expect(() => subResponseInput.parse({ id: null, groupId: jobs, title: "X", description: "", url: "ftp://x" })).toThrow();
+    expect(() => subResponseInput.parse({ id: null, groupId: jobs, title: "X", descriptionHtml: null, url: "ftp://x" })).toThrow();
     const other = await createQuiz(db, { title: "Other", slug: "other" }, "a@example.org");
     const otherGroup = await saveGroup(db, other, { id: null, name: "Jobs" }); // names are per quiz
-    await expect(saveSubResponse(db, quizId, subResponseInput.parse({ id: null, groupId: otherGroup, title: "X", description: "", url: "" }))).rejects.toMatchObject({
+    await expect(saveSubResponse(db, quizId, subResponseInput.parse({ id: null, groupId: otherGroup, title: "X", descriptionHtml: null, url: "" }))).rejects.toMatchObject({
       field: "groupId",
     });
   });
@@ -130,9 +130,9 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
       {
         group: "Jobs",
         items: [
-          { title: "Teacher", description: null, url: null },
-          { title: "DJ", description: "Play music", url: "https://example.org/dj" },
-          { title: "Ranger", description: null, url: null },
+          { title: "Teacher", descriptionHtml: null, url: null },
+          { title: "DJ", descriptionHtml: "<p>Play <strong>music</strong></p>", url: "https://example.org/dj" },
+          { title: "Ranger", descriptionHtml: null, url: null },
         ],
       },
     ]);
@@ -156,7 +156,7 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
     const quiz = (await getPublishedQuiz(db, { id: quizId }, { locale: "es" }))!;
     const first = await saveAnswers(db, quiz, { tokenHash: null, entries: [{ questionId: q1, answerIds: [a.hike] }] });
     const result = (await getResultByShareToken(db, (await submit(db, quiz, { tokenHash: first.tokenHash })).shareToken))!;
-    expect(result.match!.subResponses).toEqual([{ group: "Empleos", items: [{ title: "Pinchadiscos", description: "Play music", url: "https://example.org/dj" }] }]);
+    expect(result.match!.subResponses).toEqual([{ group: "Empleos", items: [{ title: "Pinchadiscos", descriptionHtml: "<p>Play <strong>music</strong></p>", url: "https://example.org/dj" }] }]);
   });
 
   it("restores a version's sub-responses, and carries them through export and duplicate", async () => {
@@ -182,6 +182,6 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
     const copied = await readWorkingContent(db, copy);
     const titleOf = (id: number) => copied.subResponses.find((x) => x.id === id)?.title;
     expect(copied.responses.find((r) => r.title === "Forester")!.subResponseIds.map(titleOf)).toEqual(["Teacher", "DJ"]);
-    expect(copied.subResponses.find((x) => x.title === "DJ")).toMatchObject({ description: "Play music", url: "https://example.org/dj" });
+    expect(copied.subResponses.find((x) => x.title === "DJ")).toMatchObject({ descriptionHtml: "<p>Play <strong>music</strong></p>", url: "https://example.org/dj" });
   });
 });

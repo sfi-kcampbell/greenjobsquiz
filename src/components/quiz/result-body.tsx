@@ -123,7 +123,7 @@ function SubResponses({ lists, newTab, compact = false }: { lists: SubResponseLi
                 ) : (
                   <span className="font-medium">{item.title}</span>
                 )}
-                {!compact && item.description && <p className="text-muted">{item.description}</p>}
+                {!compact && item.descriptionHtml && <RichHtml html={item.descriptionHtml} className="text-muted" />}
               </li>
             ))}
           </ul>

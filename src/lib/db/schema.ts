@@ -575,7 +575,8 @@ export const subResponses = pgTable(
       .notNull()
       .references(() => subResponseGroups.id, { onDelete: "restrict" }),
     title: text().notNull(),
-    description: text(),
+    /** Rich text, sanitized when saved. */
+    descriptionHtml: text(),
     url: text(),
     position: integer().notNull().default(0),
   },

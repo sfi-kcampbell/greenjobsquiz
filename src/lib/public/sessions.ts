@@ -558,6 +558,10 @@ type StoredRanked = { resultId: number; raw: number; title: string }[];
 export const shareOfMax = (raw: number, max: number) =>
   max > 0 ? Math.round(100 * Math.max(0, Math.min(1, raw / max))) : 0;
 
+/** Sub-responses as respondents get them: rich text sanitized, links opening in a new tab. */
+const publicSubResponses = (lists: SubResponseList): SubResponseList =>
+  lists.map((g) => ({ ...g, items: g.items.map((x) => ({ ...x, descriptionHtml: sanitizeRichText(x.descriptionHtml, { external: true }) })) }));
+
 /**
  * The token is the credential; unknown or revoked tokens look the same.
  * Shown in the language the quiz was taken in, or `opts.locale` (e.g. the
@@ -605,7 +609,7 @@ export async function getResultByShareToken(db: Executor, shareToken: string, op
       ctaLabel: c?.ctaLabel ?? null,
       percent: submission.rawSimilarity === null ? null : toPercentage(submission.rawSimilarity),
       raw: submission.rawSimilarity,
-      subResponses: latest && submission.resultId !== null ? subResponsesFor(latest.content, submission.resultId) : [],
+      subResponses: latest && submission.resultId !== null ? publicSubResponses(subResponsesFor(latest.content, submission.resultId)) : [],
     };
   }
   const limit = latest?.content.scoring.subResponseLimit ?? 3;
@@ -620,7 +624,7 @@ export async function getResultByShareToken(db: Executor, shareToken: string, op
           excerpt: c?.excerpt ?? null,
           percent: toPercentage(r.raw),
           raw: r.raw,
-          subResponses: latest ? subResponsesFor(latest.content, r.resultId, limit) : [],
+          subResponses: latest ? publicSubResponses(subResponsesFor(latest.content, r.resultId, limit)) : [],
         };
       });
 

@@ -83,7 +83,7 @@ export type QuizContent = {
   /** Groups of sub-responses (headings such as "Jobs"), in order. */
   groups: { id: number; name: string; position: number }[];
   /** Items listed under responses, in group order then position. */
-  subResponses: { id: number; groupId: number; title: string; description: string | null; url: string | null; position: number }[];
+  subResponses: { id: number; groupId: number; title: string; descriptionHtml: string | null; url: string | null; position: number }[];
   /** Admins' translations (locale → "kind:id:field" → text); see ./localize. Older versions: none. */
   translations: Translations;
 };
@@ -141,7 +141,7 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
       subResponseIds: links.filter((l) => l.resultId === r.id).map((l) => l.subResponseId),
     })),
     groups: groups.map(({ id, name, position }) => ({ id, name, position })),
-    subResponses: subs.map(({ id, groupId, title, description, url, position }) => ({ id, groupId, title, description, url, position })),
+    subResponses: subs.map(({ id, groupId, title, descriptionHtml, url, position }) => ({ id, groupId, title, descriptionHtml, url, position })),
     translations: {},
   };
   content.translations = await readTranslations(db, quizId, content);
@@ -301,7 +301,7 @@ export function diffContent(from: QuizContent, to: QuizContent): string[] {
   for (const x of to.subResponses ?? []) {
     const old = fs.get(x.id);
     if (!old) out.push(`Added sub-response ${quote(x.title)}`);
-    else if (old.title !== x.title || old.description !== x.description || old.url !== x.url || old.groupId !== x.groupId) {
+    else if (old.title !== x.title || old.descriptionHtml !== x.descriptionHtml || old.url !== x.url || old.groupId !== x.groupId) {
       out.push(`Edited sub-response ${quote(x.title)}`);
     }
   }
@@ -565,7 +565,7 @@ export async function restoreToDraft(db: Database, quizId: number, number: numbe
       if (!done.length) await tx.insert(subResponseGroups).overridingSystemValue().values({ id: g.id, quizId, ...values });
     }
     for (const x of c.subResponses) {
-      const values = { groupId: x.groupId, title: x.title, description: x.description, url: x.url, position: x.position };
+      const values = { groupId: x.groupId, title: x.title, descriptionHtml: x.descriptionHtml, url: x.url, position: x.position };
       const done = await tx.update(subResponses).set(values).where(and(eq(subResponses.id, x.id), eq(subResponses.quizId, quizId))).returning({ id: subResponses.id });
       if (!done.length) await tx.insert(subResponses).overridingSystemValue().values({ id: x.id, quizId, ...values });
     }
