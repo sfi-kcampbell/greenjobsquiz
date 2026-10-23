@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { listGroups, listSubResponses } from "@/lib/content/sub-responses";
 import { db } from "@/lib/db/client";
 import { loadQuiz } from "../../load";
-import { SubResponsesEditor } from "./sub-responses-editor";
+import { SubResponsesEditorLoader } from "./loader";
 
 export const metadata: Metadata = { title: "Sub-responses" };
 
@@ -22,7 +22,7 @@ export default async function SubResponsesPage({ params }: PageProps<"/admin/qui
           as the quiz&apos;s Scoring setting allows.
         </p>
       </div>
-      <SubResponsesEditor quizId={quiz.id} initialGroups={groups} initialItems={items} />
+      <SubResponsesEditorLoader quizId={quiz.id} initialGroups={groups} initialItems={items} />
     </section>
   );
 }
