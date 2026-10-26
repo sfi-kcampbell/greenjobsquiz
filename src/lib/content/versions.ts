@@ -9,7 +9,7 @@
  * weights and scoring settings. Live (straight from the quiz row): slug,
  * banner, CSS, delivery, respondent options and quiz codes.
  */
-import { and, count, desc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
 import type { Database, Executor } from "@/lib/db/create";
 import {
   answers,
@@ -19,7 +19,10 @@ import {
   quizVersions,
   quizzes,
   results,
+  resultSubResponses,
   resultWeights,
+  subResponseGroups,
+  subResponses,
   submissionAnswers,
   submissions,
 } from "@/lib/db/schema";
@@ -30,6 +33,7 @@ import { ContentError } from "./errors";
 import { listQuestions } from "./questions";
 import { getQuiz, lockQuiz } from "./quizzes";
 import { listResponses } from "./responses";
+import { listGroups, listSubResponses } from "./sub-responses";
 import type { ScoringBundle } from "./scoring-model";
 import type { Translations } from "./localize";
 import { readTranslations, replaceTranslations } from "./translations";
@@ -42,7 +46,13 @@ type Weights = Record<string, number>;
 export type QuizContent = {
   title: string;
   introHtml: string;
-  scoring: { normalizePerCategory: boolean; runnersUpCount: number; defaultResultId: number | null };
+  scoring: {
+    normalizePerCategory: boolean;
+    runnersUpCount: number;
+    defaultResultId: number | null;
+    /** Sub-responses each runner-up shows, per group (older versions: 3). */
+    subResponseLimit: number;
+  };
   categories: { id: number; name: string; abbr: string; color: string; importance: number; position: number }[];
   questions: {
     id: number;
@@ -67,7 +77,13 @@ export type QuizContent = {
     ctaLabel: string | null;
     position: number;
     weights: Weights;
+    /** The sub-responses it lists, in its order. */
+    subResponseIds: number[];
   }[];
+  /** Groups of sub-responses (headings such as "Jobs"), in order. */
+  groups: { id: number; name: string; position: number }[];
+  /** Items listed under responses, in group order then position. */
+  subResponses: { id: number; groupId: number; title: string; descriptionHtml: string | null; url: string | null; position: number }[];
   /** Admins' translations (locale → "kind:id:field" → text); see ./localize. Older versions: none. */
   translations: Translations;
 };
@@ -81,10 +97,24 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
   const cats = await listCategories(db, quizId);
   const qs = await listQuestions(db, quizId);
   const rs = await listResponses(db, quizId);
+  const groups = await listGroups(db, quizId);
+  const subs = await listSubResponses(db, quizId);
+  const links = rs.length
+    ? await db
+        .select()
+        .from(resultSubResponses)
+        .where(inArray(resultSubResponses.resultId, rs.map((r) => r.id)))
+        .orderBy(asc(resultSubResponses.position))
+    : [];
   const content: QuizContent = {
     title: quiz.title,
     introHtml: quiz.introHtml,
-    scoring: { normalizePerCategory: quiz.normalizePerCategory, runnersUpCount: quiz.runnersUpCount, defaultResultId: quiz.defaultResultId },
+    scoring: {
+      normalizePerCategory: quiz.normalizePerCategory,
+      runnersUpCount: quiz.runnersUpCount,
+      defaultResultId: quiz.defaultResultId,
+      subResponseLimit: quiz.subResponseLimit,
+    },
     categories: cats.map(({ id, name, abbr, color, importance, position }) => ({ id, name, abbr, color, importance, position })),
     questions: qs.map((q) => ({
       id: q.id,
@@ -108,7 +138,10 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
       ctaLabel: r.ctaLabel,
       position: r.position,
       weights: strKeys(r.weights),
+      subResponseIds: links.filter((l) => l.resultId === r.id).map((l) => l.subResponseId),
     })),
+    groups: groups.map(({ id, name, position }) => ({ id, name, position })),
+    subResponses: subs.map(({ id, groupId, title, descriptionHtml, url, position }) => ({ id, groupId, title, descriptionHtml, url, position })),
     translations: {},
   };
   content.translations = await readTranslations(db, quizId, content);
@@ -243,16 +276,39 @@ export function diffContent(from: QuizContent, to: QuizContent): string[] {
     const old = fr.get(r.id);
     if (!old) out.push(`Added response ${quote(r.title)}`);
     else {
-      const { weights: ow, position: _op, ...oText } = old;
-      const { weights: nw, position: _np, ...nText } = r;
+      const { weights: ow, position: _op, subResponseIds: os, ...oText } = old;
+      const { weights: nw, position: _np, subResponseIds: ns, ...nText } = r;
       if (canonical(oText) !== canonical(nText)) out.push(`Edited response ${quote(r.title)}`);
       if (!weightsEqual(ow, nw)) out.push(`Changed the weights for response ${quote(r.title)}`);
+      if ((os ?? []).join() !== (ns ?? []).join()) out.push(`Changed the sub-responses for response ${quote(r.title)}`);
     }
   }
   for (const r of from.responses) if (!tr.has(r.id)) out.push(`Removed response ${quote(r.title)}`);
   if (from.responses.map((r) => r.id).filter((id) => tr.has(id)).join() !== to.responses.map((r) => r.id).filter((id) => fr.has(id)).join()) {
     out.push("Reordered responses");
   }
+
+  const fg = byId(from.groups ?? []);
+  const tg = byId(to.groups ?? []);
+  for (const g of to.groups ?? []) {
+    const old = fg.get(g.id);
+    if (!old) out.push(`Added group ${quote(g.name)}`);
+    else if (old.name !== g.name) out.push(`Renamed group ${quote(old.name)} to ${quote(g.name)}`);
+  }
+  for (const g of from.groups ?? []) if (!tg.has(g.id)) out.push(`Removed group ${quote(g.name)}`);
+  const fs = byId(from.subResponses ?? []);
+  const ts = byId(to.subResponses ?? []);
+  for (const x of to.subResponses ?? []) {
+    const old = fs.get(x.id);
+    if (!old) out.push(`Added sub-response ${quote(x.title)}`);
+    else if (old.title !== x.title || old.descriptionHtml !== x.descriptionHtml || old.url !== x.url || old.groupId !== x.groupId) {
+      out.push(`Edited sub-response ${quote(x.title)}`);
+    }
+  }
+  for (const x of from.subResponses ?? []) if (!ts.has(x.id)) out.push(`Removed sub-response ${quote(x.title)}`);
+  const order = (c: QuizContent) => [...(c.groups ?? []).map((g) => `g${g.id}`), ...(c.subResponses ?? []).map((x) => `s${x.id}`)];
+  const kept = (c: QuizContent, other: QuizContent) => order(c).filter((k) => order(other).includes(k)).join();
+  if (kept(from, to) !== kept(to, from)) out.push("Reordered sub-responses");
 
   const locales = [...new Set([...Object.keys(from.translations ?? {}), ...Object.keys(to.translations ?? {})])].sort();
   for (const locale of locales) {
@@ -276,7 +332,11 @@ function asVersion(row: typeof quizVersions.$inferSelect): VersionRow {
     ...row,
     content: {
       ...content,
+      scoring: { ...content.scoring, subResponseLimit: content.scoring.subResponseLimit ?? 3 },
       questions: content.questions.map((q) => ({ ...q, part: q.part ?? "scored" })),
+      responses: content.responses.map((r) => ({ ...r, subResponseIds: r.subResponseIds ?? [] })),
+      groups: content.groups ?? [],
+      subResponses: content.subResponses ?? [],
       translations: content.translations ?? {},
     },
   };
@@ -485,11 +545,34 @@ export async function restoreToDraft(db: Database, quizId: number, number: numbe
         introHtml: c.introHtml,
         normalizePerCategory: c.scoring.normalizePerCategory,
         runnersUpCount: c.scoring.runnersUpCount,
+        subResponseLimit: c.scoring.subResponseLimit,
         defaultResultId: c.scoring.defaultResultId,
         structureVersion: sql`${quizzes.structureVersion} + 1`,
         updatedAt: new Date(),
       })
       .where(eq(quizzes.id, quizId));
+
+    // Sub-responses: links go first (they're rebuilt), then items and groups, matched by id.
+    const quizResultIds = (await tx.select({ id: results.id }).from(results).where(eq(results.quizId, quizId))).map((r) => r.id);
+    if (quizResultIds.length) await tx.delete(resultSubResponses).where(inArray(resultSubResponses.resultId, quizResultIds));
+    const keepS = c.subResponses.map((x) => x.id);
+    await tx.delete(subResponses).where(and(eq(subResponses.quizId, quizId), keepS.length ? notInArray(subResponses.id, keepS) : undefined));
+    // Park names first, so swapping them between groups can't clash.
+    await tx.update(subResponseGroups).set({ name: sql`'~restore~' || ${subResponseGroups.id}` }).where(eq(subResponseGroups.quizId, quizId));
+    for (const g of c.groups) {
+      const values = { name: g.name, position: g.position };
+      const done = await tx.update(subResponseGroups).set(values).where(and(eq(subResponseGroups.id, g.id), eq(subResponseGroups.quizId, quizId))).returning({ id: subResponseGroups.id });
+      if (!done.length) await tx.insert(subResponseGroups).overridingSystemValue().values({ id: g.id, quizId, ...values });
+    }
+    for (const x of c.subResponses) {
+      const values = { groupId: x.groupId, title: x.title, descriptionHtml: x.descriptionHtml, url: x.url, position: x.position };
+      const done = await tx.update(subResponses).set(values).where(and(eq(subResponses.id, x.id), eq(subResponses.quizId, quizId))).returning({ id: subResponses.id });
+      if (!done.length) await tx.insert(subResponses).overridingSystemValue().values({ id: x.id, quizId, ...values });
+    }
+    const keepG = c.groups.map((g) => g.id);
+    await tx.delete(subResponseGroups).where(and(eq(subResponseGroups.quizId, quizId), keepG.length ? notInArray(subResponseGroups.id, keepG) : undefined));
+    const links = c.responses.flatMap((r) => r.subResponseIds.map((subResponseId, position) => ({ resultId: r.id, subResponseId, position })));
+    if (links.length) await tx.insert(resultSubResponses).values(links);
 
     await replaceTranslations(tx, quizId, c);
   });

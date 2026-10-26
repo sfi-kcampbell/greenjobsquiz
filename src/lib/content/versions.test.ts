@@ -4,7 +4,7 @@ import { bundleFromContent, canonical, diffContent, type QuizContent } from "./v
 const base: QuizContent = {
   title: "Green Jobs",
   introHtml: "<p>Hi</p>",
-  scoring: { normalizePerCategory: true, runnersUpCount: 2, defaultResultId: null },
+  scoring: { normalizePerCategory: true, runnersUpCount: 2, defaultResultId: null, subResponseLimit: 3 },
   categories: [
     { id: 1, name: "Outdoors", abbr: "OUTD", color: "#3f7d4e", importance: 1, position: 0 },
     { id: 2, name: "Analytical", abbr: "ANLY", color: "#2f6690", importance: 1, position: 1 },
@@ -13,7 +13,9 @@ const base: QuizContent = {
     { id: 10, title: "Weekend?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, part: "scored", position: 0, answers: [{ id: 100, label: "Hike", bodyHtml: null, position: 0, weights: { "1": 3 } }] },
     { id: 11, title: "Tools?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, part: "scored", position: 1, answers: [{ id: 110, label: "Saw", bodyHtml: null, position: 0, weights: { "1": 2 } }] },
   ],
-  responses: [{ id: 50, title: "Forester", excerpt: null, bodyHtml: "", ctaUrl: null, ctaLabel: null, position: 0, weights: { "1": 5 } }],
+  responses: [{ id: 50, title: "Forester", excerpt: null, bodyHtml: "", ctaUrl: null, ctaLabel: null, position: 0, weights: { "1": 5 }, subResponseIds: [] }],
+  groups: [],
+  subResponses: [],
   translations: {},
 };
 

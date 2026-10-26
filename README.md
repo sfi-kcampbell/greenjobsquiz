@@ -248,3 +248,16 @@ Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`
   - Submissions record `locale`. Their snapshots stay in English.
   - Shared results, the printable page and the share card use the language the quiz was taken in.
 - **Adding a language:** add `src/lib/i18n/messages/{code}.ts` (typed against `en.ts`) and an entry in `src/lib/i18n/locales.ts`.
+
+## Sub-responses
+
+- **What they are:** items listed under responses, such as jobs under a personality type. They're grouped, and each group becomes a heading ("Jobs").
+- **Setting them up:**
+  - Admins set them up in the builder's **Sub-responses** tab (title, optional rich text, as in other text fields, and link).
+  - They attach them on each response's page, in that response's own order. One item can belong to many responses.
+- **What respondents see:**
+  - The best match lists **all** of its sub-responses.
+  - Runners-up list up to **Sub-responses shown for each runner-up, per group** (quiz settings → Scoring).
+- **Publishing and translation:** sub-responses are versioned like other content, and translatable.
+- **API:** the result payload has `match.subResponses` and `runnersUp[].subResponses`, each a list of `{ group, items: [{ title, descriptionHtml, url }] }`.
+

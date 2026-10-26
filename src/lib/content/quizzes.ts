@@ -131,6 +131,7 @@ export async function updateQuizScoring(db: Database, id: number, input: QuizSco
       .update(quizzes)
       .set({
         runnersUpCount: input.runnersUpCount,
+        ...(input.subResponseLimit !== undefined ? { subResponseLimit: input.subResponseLimit } : {}),
         normalizePerCategory: input.normalizePerCategory,
         defaultResultId: input.defaultResultId,
       })

@@ -106,6 +106,7 @@ export async function updateScoringAction(
   try {
     const input = quizScoringInput.parse({
       runnersUpCount: formData.get("runnersUpCount"),
+      subResponseLimit: formData.get("subResponseLimit") ?? undefined,
       normalizePerCategory: formData.get("normalizePerCategory") === "on",
       defaultResultId: formData.get("defaultResultId") || null,
     });

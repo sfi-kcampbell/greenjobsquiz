@@ -248,10 +248,39 @@ export const responseDetailsInput = z
   });
 export type ResponseDetailsInput = z.infer<typeof responseDetailsInput>;
 
+/* ----------------------------- Sub-responses ---------------------------- */
+
+export const MAX_SUB_RESPONSE_GROUPS = 20;
+export const MAX_SUB_RESPONSES = 500;
+export const MAX_SUB_RESPONSES_PER_RESPONSE = 50;
+
+export const subResponseGroupInput = z.object({
+  id: z.coerce.number().int().positive().nullable(),
+  name: z.string().trim().min(1, "Enter a name.").max(60, "Keep the name under 60 characters."),
+});
+export type SubResponseGroupInput = z.infer<typeof subResponseGroupInput>;
+
+export const subResponseInput = z.object({
+  id: z.coerce.number().int().positive().nullable(),
+  groupId: z.coerce.number().int().positive({ error: "Choose a group." }),
+  title: z.string().trim().min(1, "Enter a title.").max(120, "Keep the title under 120 characters."),
+  /** Rich text (sanitized when saved). */
+  descriptionHtml: richText,
+  url: z
+    .string()
+    .trim()
+    .max(2000)
+    .transform((v) => v || null)
+    .refine((v) => v === null || /^https?:\/\/[^\s]+$/i.test(v), "Enter a full web address starting with https://"),
+});
+export type SubResponseInput = z.infer<typeof subResponseInput>;
+
 /* ------------------------------ Quiz scoring ---------------------------- */
 
 export const quizScoringInput = z.object({
   runnersUpCount: z.coerce.number().int().min(0, "Use 0 to 5.").max(5, "Use 0 to 5."),
+  /** Optional: callers that don't send it leave the setting as it is. */
+  subResponseLimit: z.coerce.number().int().min(0, "Use 0 to 20.").max(20, "Use 0 to 20.").optional(),
   normalizePerCategory: z.boolean(),
   defaultResultId: z.coerce
     .number()

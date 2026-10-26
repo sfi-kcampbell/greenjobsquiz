@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ScoringBundle } from "@/lib/content/scoring-model";
 import { score, type ScoringModel, type ScoringWarning, type Selection } from "@/lib/scoring/engine";
 import { findAnswersFor } from "@/lib/scoring/search";
+import type { SubResponseList } from "@/lib/content/sub-response-list";
 
 type Picks = Record<number, number[]>;
 
@@ -29,11 +30,17 @@ export function Simulator({
   model,
   display,
   runnersUpCount,
+  subResponses = {},
+  subResponseLimit = 3,
 }: {
   quizId: number;
   model: ScoringModel;
   display: ScoringBundle["display"];
   runnersUpCount: number;
+  /** Each response's sub-responses (all of them), by group. */
+  subResponses?: Record<number, SubResponseList>;
+  /** How many per group a runner-up shows. */
+  subResponseLimit?: number;
 }) {
   // Client-only component (see loader.tsx), so sessionStorage is safe here.
   const [picks, setPicks] = useState<Picks>(() => readPicks(quizId, model));
@@ -190,6 +197,15 @@ export function Simulator({
                       <td className="px-3 py-2">
                         {titleOf(r.resultId)}
                         {role && <span className="ml-2 text-xs font-normal text-muted">{role}</span>}
+                        {role &&
+                          (subResponses[r.resultId] ?? []).map((g) => {
+                            const shown = i === 0 ? g.items : g.items.slice(0, subResponseLimit);
+                            return shown.length ? (
+                              <span key={g.group} className="block text-xs font-normal text-muted">
+                                {g.group}: {shown.map((x) => x.title).join(", ")}
+                              </span>
+                            ) : null;
+                          })}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{r.percent}%</td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmt(r.raw)}</td>

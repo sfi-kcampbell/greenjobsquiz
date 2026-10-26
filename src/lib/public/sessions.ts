@@ -13,6 +13,7 @@ import { sanitizeRichText } from "@/lib/sanitize/rich-text";
 import { score, toPercentage, type Selection } from "@/lib/scoring/engine";
 import { PublicError } from "./errors";
 import { localizeContent, translationKey } from "@/lib/content/localize";
+import { subResponsesFor, type SubResponseList } from "@/lib/content/sub-response-list";
 import { offeredLocales, type Locale } from "@/lib/i18n/locales";
 import { getPublishedQuiz, getPublishedQuizAtVersionId, type PublicQuiz } from "./structure";
 import { hashToken, newToken, shareTokenFor } from "./tokens";
@@ -537,8 +538,11 @@ export type ResultPayload = {
     ctaLabel: string | null;
     percent: number | null;
     raw: number | null;
+    /** All the sub-responses it lists, by group. */
+    subResponses: SubResponseList;
   } | null;
-  runnersUp: { resultId: number; title: string; excerpt: string | null; percent: number; raw: number }[];
+  /** Each with its sub-responses, up to the quiz's limit per group. */
+  runnersUp: { resultId: number; title: string; excerpt: string | null; percent: number; raw: number; subResponses: SubResponseList }[];
   /** Per category; `percent` is the score as a share of the most achievable (0–100). */
   scores: Record<string, { raw: number; normalized: number | null; percent: number; label: string; color: string }>;
 };
@@ -553,6 +557,10 @@ type StoredRanked = { resultId: number; raw: number; title: string }[];
 
 export const shareOfMax = (raw: number, max: number) =>
   max > 0 ? Math.round(100 * Math.max(0, Math.min(1, raw / max))) : 0;
+
+/** Sub-responses as respondents get them: rich text sanitized, links opening in a new tab. */
+const publicSubResponses = (lists: SubResponseList): SubResponseList =>
+  lists.map((g) => ({ ...g, items: g.items.map((x) => ({ ...x, descriptionHtml: sanitizeRichText(x.descriptionHtml, { external: true }) })) }));
 
 /**
  * The token is the credential; unknown or revoked tokens look the same.
@@ -601,14 +609,23 @@ export async function getResultByShareToken(db: Executor, shareToken: string, op
       ctaLabel: c?.ctaLabel ?? null,
       percent: submission.rawSimilarity === null ? null : toPercentage(submission.rawSimilarity),
       raw: submission.rawSimilarity,
+      subResponses: latest && submission.resultId !== null ? publicSubResponses(subResponsesFor(latest.content, submission.resultId)) : [],
     };
   }
+  const limit = latest?.content.scoring.subResponseLimit ?? 3;
 
   const runnersUp = scores.isFallback
     ? []
     : ranked.slice(1, 1 + runnersUpCount).map((r) => {
         const c = content.get(r.resultId);
-        return { resultId: r.resultId, title: c?.title ?? r.title, excerpt: c?.excerpt ?? null, percent: toPercentage(r.raw), raw: r.raw };
+        return {
+          resultId: r.resultId,
+          title: c?.title ?? r.title,
+          excerpt: c?.excerpt ?? null,
+          percent: toPercentage(r.raw),
+          raw: r.raw,
+          subResponses: latest ? publicSubResponses(subResponsesFor(latest.content, r.resultId, limit)) : [],
+        };
       });
 
   return {

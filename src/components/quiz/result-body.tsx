@@ -1,4 +1,5 @@
 import type { Ref } from "react";
+import type { SubResponseList } from "@/lib/content/sub-response-list";
 import type { ResultPayload } from "@/lib/public/sessions";
 import { RichHtml } from "./rich-html";
 import { messagesFor } from "@/lib/i18n";
@@ -49,6 +50,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
                 </a>
               </p>
             )}
+            {match.subResponses?.length > 0 && <SubResponses lists={match.subResponses} newTab={m.opensInNewTab} />}
           </>
         ) : (
           <h2 id="result-title" ref={headingRef} tabIndex={-1} className="text-2xl font-semibold focus:outline-none">
@@ -70,6 +72,7 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
                   <span className="text-sm text-muted tabular-nums">{m.percentMatch(r.percent)}</span>
                 </p>
                 {r.excerpt && <p className="mt-1 text-muted">{r.excerpt}</p>}
+                {r.subResponses?.length > 0 && <SubResponses lists={r.subResponses} newTab={m.opensInNewTab} compact />}
               </li>
             ))}
           </ul>
@@ -98,5 +101,34 @@ export function ResultBody({ result, headingRef }: { result: ResultPayload; head
       )}
 
     </>
+  );
+}
+
+/** A response's sub-responses (e.g. jobs), a heading per group. Compact: titles only (runners-up). */
+function SubResponses({ lists, newTab, compact = false }: { lists: SubResponseList; newTab: string; compact?: boolean }) {
+  const Heading = compact ? "h4" : "h3";
+  return (
+    <div className={`pltq-sub-responses flex flex-col ${compact ? "mt-2 gap-2 text-sm" : "mt-2 gap-4"}`}>
+      {lists.map((list) => (
+        <div key={list.group} className="pltq-sub-response-group flex flex-col gap-1">
+          <Heading className={compact ? "font-medium text-muted" : "text-lg font-semibold"}>{list.group}</Heading>
+          <ul className={compact ? "flex flex-wrap gap-x-3 gap-y-1" : "flex list-disc flex-col gap-1.5 pl-5"}>
+            {list.items.map((item, i) => (
+              <li key={`${item.title}-${i}`} className="pltq-sub-response">
+                {item.url ? (
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline underline-offset-4">
+                    {item.title}
+                    <span className="sr-only">{newTab}</span>
+                  </a>
+                ) : (
+                  <span className="font-medium">{item.title}</span>
+                )}
+                {!compact && item.descriptionHtml && <RichHtml html={item.descriptionHtml} className="text-muted" />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
   );
 }

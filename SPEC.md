@@ -698,6 +698,20 @@ allowed origins in Settings, and the default allows all.
 
 ---
 
+### Sub-responses
+
+- **Tables:**
+  - `sub_response_groups`: headings, unique per quiz.
+  - `sub_responses`: title, optional rich-text description (sanitized like other rich text) and https link, ordered within their
+    group.
+  - `result_sub_responses`: the many-to-many link, ordered per response.
+- **Publishing:** they're versioned with the content (`groups`, `subResponses`,
+  `responses[].subResponseIds`, `scoring.subResponseLimit`) and translatable (`group:id:name`,
+  `subresponse:id:title|descriptionHtml`).
+- **On the result:** the best match lists all of its sub-responses, and runners-up list up to
+  `quizzes.sub_response_limit` per group (0–20, default 3). They're taken from the latest version in
+  the respondent's language.
+
 ### Languages
 
 - **Source language:** English. A quiz offers extra languages (`quizzes.languages`, live) from the

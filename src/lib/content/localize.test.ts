@@ -5,7 +5,7 @@ import { diffContent, type QuizContent } from "./versions";
 const content: QuizContent = {
   title: "Green Jobs",
   introHtml: "<p>Hi</p>",
-  scoring: { normalizePerCategory: true, runnersUpCount: 2, defaultResultId: null },
+  scoring: { normalizePerCategory: true, runnersUpCount: 2, defaultResultId: null, subResponseLimit: 3 },
   categories: [{ id: 1, name: "Outdoors", abbr: "OUTD", color: "#3f7d4e", importance: 1, position: 0 }],
   questions: [
     {
@@ -25,7 +25,9 @@ const content: QuizContent = {
       ],
     },
   ],
-  responses: [{ id: 50, title: "Forester", excerpt: "Trees", bodyHtml: "<p>Forests</p>", ctaUrl: "https://example.org", ctaLabel: "More", position: 0, weights: { "1": 5 } }],
+  responses: [{ id: 50, title: "Forester", excerpt: "Trees", bodyHtml: "<p>Forests</p>", ctaUrl: "https://example.org", ctaLabel: "More", position: 0, weights: { "1": 5 }, subResponseIds: [] }],
+  groups: [],
+  subResponses: [],
   translations: { es: { "quiz:0:title": "Empleos verdes", "question:10:title": "¿Fin de semana?", "answer:100:label": "Caminata", "category:1:name": "Aire libre" } },
 };
 
