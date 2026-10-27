@@ -1,7 +1,11 @@
 "use client";
 
+import { closestCenter, DndContext, type Announcements, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { useSortSensors } from "@/components/builder/hooks";
 import { setResponseSubResponsesAction } from "../../sub-responses/actions";
 
 type Group = { id: number; name: string };
@@ -11,7 +15,8 @@ const smallButton = "rounded-md border border-border px-2 py-0.5 text-xs font-me
 
 /**
  * Which sub-responses this response lists (e.g. its jobs), and their order.
- * Ticking adds an item at the end of its group; the list above sets the order.
+ * Ticking adds an item at the end of its group; dragging in the list above
+ * sets the order within each group (the order respondents see).
  */
 export function SubResponsesPanel({
   quizId,
@@ -35,6 +40,8 @@ export function SubResponsesPanel({
   const [pickerOpen] = useState(initialIds.length === 0);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
+  const dndId = useId();
+  const sensors = useSortSensors();
   const byId = new Map(items.map((x) => [x.id, x]));
   const dirty = ids.join() !== saved.join();
 
@@ -51,16 +58,29 @@ export function SubResponsesPanel({
   }
 
   const toggle = (id: number, on: boolean) => setIds((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
-  /** Swaps with the previous or next item of the same group (that's the order respondents see). */
-  const shift = (id: number, dir: -1 | 1) =>
+  /** Moves an item within its group; the other groups keep their places in the list. */
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
     setIds((cur) => {
-      const groupId = byId.get(id)?.groupId;
+      const groupId = byId.get(Number(active.id))?.groupId;
+      if (groupId === undefined || byId.get(Number(over.id))?.groupId !== groupId) return cur;
       const same = cur.filter((x) => byId.get(x)?.groupId === groupId);
-      const at = same.indexOf(id);
-      const other = same[at + dir];
-      if (other === undefined) return cur;
-      return cur.map((x) => (x === id ? other : x === other ? id : x));
+      const moved = arrayMove(same, same.indexOf(Number(active.id)), same.indexOf(Number(over.id)));
+      let i = 0;
+      return cur.map((x) => (byId.get(x)?.groupId === groupId ? moved[i++] : x));
     });
+  };
+  const titleOf = (id: string | number) => byId.get(Number(id))?.title ?? "item";
+  const positionOf = (id: string | number) => {
+    const groupId = byId.get(Number(id))?.groupId;
+    return ids.filter((x) => byId.get(x)?.groupId === groupId).indexOf(Number(id)) + 1;
+  };
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${titleOf(active.id)}.`,
+    onDragOver: ({ over }) => (over ? `Moving to position ${positionOf(over.id)}.` : undefined),
+    onDragEnd: ({ over }) => (over ? `Dropped at position ${positionOf(over.id)}. Save to keep the new order.` : "Dropped."),
+    onDragCancel: () => "Reordering cancelled.",
+  };
   const term = filter.trim().toLowerCase();
 
   return (
@@ -72,27 +92,15 @@ export function SubResponsesPanel({
           return (
             <div key={g.id} className="flex flex-col gap-1">
               <h4 className="font-medium">{g.name}</h4>
-              <ol className="flex flex-col gap-1">
-                {listed.map((id, i) => {
-                  const title = byId.get(id)?.title ?? "";
-                  return (
-                    <li key={id} className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1">
-                      <span className="mr-auto">
-                        {i + 1}. {title}
-                      </span>
-                      <button type="button" disabled={i === 0} onClick={() => shift(id, -1)} className={smallButton}>
-                        Up<span className="sr-only"> {title}</span>
-                      </button>
-                      <button type="button" disabled={i === listed.length - 1} onClick={() => shift(id, 1)} className={smallButton}>
-                        Down<span className="sr-only"> {title}</span>
-                      </button>
-                      <button type="button" onClick={() => toggle(id, false)} className={`${smallButton} text-danger`}>
-                        Remove<span className="sr-only"> {title}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
+              <DndContext id={`${dndId}-${g.id}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ announcements }}>
+                <SortableContext items={listed} strategy={verticalListSortingStrategy}>
+                  <ol className="flex flex-col gap-1" aria-label={`${g.name} listed under this response`}>
+                    {listed.map((id, i) => (
+                      <ListedRow key={id} id={id} number={i + 1} title={byId.get(id)?.title ?? ""} onRemove={() => toggle(id, false)} />
+                    ))}
+                  </ol>
+                </SortableContext>
+              </DndContext>
             </div>
           );
         })}
@@ -148,5 +156,34 @@ export function SubResponsesPanel({
         </p>
       </div>
     </div>
+  );
+}
+
+function ListedRow({ id, number, title, onRemove }: { id: number; number: number; title: string; onRemove: () => void }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={`flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-2 py-1 ${isDragging ? "relative z-30 shadow-lg" : ""}`}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${title}`}
+        title="Drag to reorder (or press Space, then arrow keys)"
+        className="cursor-grab rounded px-1.5 text-muted hover:bg-border/40"
+      >
+        ⠿
+      </button>
+      <span className="mr-auto">
+        {number}. {title}
+      </span>
+      <button type="button" onClick={onRemove} className={`${smallButton} text-danger`}>
+        Remove<span className="sr-only"> {title}</span>
+      </button>
+    </li>
   );
 }
