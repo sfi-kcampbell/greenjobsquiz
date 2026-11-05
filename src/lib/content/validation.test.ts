@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   accessSettingsInput,
+  MAX_ANSWERS,
   CSS_MAX,
   cssProblem,
   customCssInput,
@@ -152,8 +153,9 @@ describe("questionInput", () => {
 
   it("requires labels and limits answer count", () => {
     expect(questionInput.safeParse({ ...base, answers: [{ ...answer("a"), label: "  " }] }).success).toBe(false);
-    const many = Array.from({ length: 13 }, (_, i) => answer(String(i)));
-    expect(questionInput.safeParse({ ...base, answers: many }).success).toBe(false);
+    const many = (n: number) => Array.from({ length: n }, (_, i) => answer(String(i)));
+    expect(questionInput.safeParse({ ...base, answers: many(MAX_ANSWERS) }).success).toBe(true);
+    expect(questionInput.safeParse({ ...base, answers: many(MAX_ANSWERS + 1) }).success).toBe(false);
     expect(questionInput.safeParse({ ...base, answers: [answer("a"), answer("a")] }).success).toBe(false);
   });
 });

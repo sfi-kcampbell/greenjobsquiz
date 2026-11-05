@@ -179,4 +179,14 @@ describe.skipIf(!TEST_DATABASE_URL)("content: questions (Postgres)", () => {
     await db.insert(questions).values(rows);
     await expectContentError(saveQuestion(db, quizId, q()), "limit");
   });
+
+  it(`saves a multiple-choice question with ${MAX_ANSWERS} answers, all pickable, and refuses one more`, async () => {
+    const answers = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ key: `k${i}`, id: null, label: `Answer ${i + 1}`, bodyHtml: null, weights: { [outdoors]: (i % 5) + 1 } }));
+    const saved = await saveQuestion(db, quizId, q({ type: "multi", minSelect: 1, maxSelect: MAX_ANSWERS, answers: answers(MAX_ANSWERS) }));
+    const [question] = (await listQuestions(db, quizId)).filter((x) => x.id === saved.questionId);
+    expect(question.answers).toHaveLength(MAX_ANSWERS);
+    expect(question.maxSelect).toBe(MAX_ANSWERS);
+    expect(() => q({ type: "multi", maxSelect: MAX_ANSWERS, answers: answers(MAX_ANSWERS + 1) })).toThrow(/at most 25 answers/);
+  });
 });
