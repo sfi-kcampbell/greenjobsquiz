@@ -132,7 +132,7 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
 /* ------------------------------- Questions ------------------------------ */
 
 export const MAX_QUESTIONS = 100;
-export const MAX_ANSWERS = 12;
+export const MAX_ANSWERS = 25;
 export const WEIGHT_MIN = -5;
 export const WEIGHT_MAX = 5;
 const RICH_TEXT_MAX = 20_000;
