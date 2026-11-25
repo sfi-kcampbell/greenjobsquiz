@@ -8,6 +8,7 @@ const question = (id: number, extra: Partial<PublicQuestion> = {}): PublicQuesti
   id,
   title: `Q${id}`,
   part: "scored",
+  columns: 1,
   helpHtml: null,
   type: "single",
   minSelect: 1,

@@ -31,6 +31,8 @@ export type Card = {
   savedPart: "pre" | "scored" | "post";
   required: boolean;
   splitMulti: boolean;
+  /** "1" | "2" | "3": answers shown in this many columns. */
+  columns: string;
   minSelect: string;
   maxSelect: string;
   answers: AnswerRow[];
@@ -65,6 +67,7 @@ export function cardFromServer(q: QuestionView, previous?: Card): Card {
     savedPart: q.part,
     required: q.required,
     splitMulti: q.splitMulti,
+    columns: String(q.columns),
     minSelect: String(q.minSelect),
     maxSelect: String(q.maxSelect),
     answers: q.answers.map((a) => {
@@ -94,6 +97,7 @@ export function emptyCard(part: Card["part"] = "scored"): Card {
     savedPart: part,
     required: true,
     splitMulti: false,
+    columns: "1",
     minSelect: "1",
     maxSelect: "1",
     answers: [emptyAnswer(), emptyAnswer()],
@@ -114,6 +118,7 @@ export function toInput(card: Card, categories: CategoryHeader[]) {
     part: card.part,
     required: card.required,
     splitMulti: card.splitMulti,
+    columns: card.columns,
     minSelect: card.minSelect,
     maxSelect: card.maxSelect,
     answers: card.answers.map((a) => ({

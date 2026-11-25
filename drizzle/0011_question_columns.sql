@@ -1,0 +1,2 @@
+ALTER TABLE "questions" ADD COLUMN "columns" smallint DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE "questions" ADD CONSTRAINT "questions_columns_range" CHECK ("questions"."columns" between 1 and 3);

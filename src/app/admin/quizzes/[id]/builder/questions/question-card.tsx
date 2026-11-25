@@ -163,6 +163,25 @@ export function QuestionCard({ card, index, categories, open, onToggle, onPatch,
                 <option value="post">Follow-up after the result (not scored)</option>
               </select>
             </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor={id("columns")} className="font-medium">
+                Answer layout
+              </label>
+              <select
+                id={id("columns")}
+                value={card.columns}
+                onChange={(e) => set("columns", e.target.value)}
+                aria-describedby={id("columns-hint")}
+                className="rounded-md border border-border bg-surface px-2 py-1.5"
+              >
+                <option value="1">1 column (default)</option>
+                <option value="2">2 columns</option>
+                <option value="3">3 columns</option>
+              </select>
+              <span id={id("columns-hint")} className="text-xs text-muted">
+                Phones always show one column.
+              </span>
+            </div>
             {card.type === "multi" && (
               <>
                 <NumberField

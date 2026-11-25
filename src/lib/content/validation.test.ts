@@ -151,6 +151,13 @@ describe("questionInput", () => {
     expect(questionInput.safeParse({ ...base, answers: [answer("a", { cat: 1 })] }).success).toBe(false);
   });
 
+  it("defaults to one column and allows 1–3", () => {
+    expect(questionInput.parse({ ...base, answers: [answer("a")] }).columns).toBe(1);
+    expect(questionInput.parse({ ...base, columns: "3", answers: [answer("a")] }).columns).toBe(3);
+    expect(questionInput.safeParse({ ...base, columns: 4, answers: [answer("a")] }).success).toBe(false);
+    expect(questionInput.safeParse({ ...base, columns: 0, answers: [answer("a")] }).success).toBe(false);
+  });
+
   it("requires labels and limits answer count", () => {
     expect(questionInput.safeParse({ ...base, answers: [{ ...answer("a"), label: "  " }] }).success).toBe(false);
     const many = (n: number) => Array.from({ length: n }, (_, i) => answer(String(i)));

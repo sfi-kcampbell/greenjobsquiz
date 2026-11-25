@@ -17,6 +17,7 @@ const content: QuizContent = {
       maxSelect: 1,
       required: true,
       splitMulti: false,
+      columns: 1,
       part: "scored",
       position: 0,
       answers: [

@@ -95,6 +95,10 @@ export const FAQ: FaqSection[] = [
             <li>
               Click <Ui>Save question</Ui>, or <Ui>Save all</Ui> to save every changed card at once.
             </li>
+                      <li>
+              Lots of answers? Set <Ui>Answer layout</Ui> to 2 or 3 columns so respondents scroll less. Phones always show
+              one column.
+            </li>
           </Steps>
         ),
       },

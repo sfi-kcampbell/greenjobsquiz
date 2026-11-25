@@ -169,6 +169,8 @@ export const questionInput = z
   .object({
     id: z.coerce.number().int().positive().nullable(),
     part: z.enum(QUESTION_PARTS).default("scored"),
+    /** Answers shown in 1–3 columns (phones always show one). */
+    columns: z.coerce.number().int().min(1, "Use 1, 2 or 3 columns.").max(3, "Use 1, 2 or 3 columns.").default(1),
     title: z.string().trim().min(1, "Enter the question.").max(300, "Keep the question under 300 characters."),
     helpHtml: richText,
     type: z.enum(["single", "multi"]),

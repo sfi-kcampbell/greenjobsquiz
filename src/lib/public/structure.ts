@@ -23,6 +23,8 @@ export type PublicQuestion = {
   minSelect: number;
   maxSelect: number;
   required: boolean;
+  /** Answers shown in this many columns on wider screens (1–3; phones always show one). */
+  columns: number;
   /** "pre": asked before the scored questions (not scored); "scored"; "post": a follow-up under the result. */
   part: "pre" | "scored" | "post";
   answers: PublicAnswer[];
@@ -125,6 +127,7 @@ function toPublicQuestion(q: VersionRow["content"]["questions"][number]): Public
     type: q.type,
     minSelect: q.minSelect,
     maxSelect: q.maxSelect,
+    columns: q.columns ?? 1,
     required: q.required,
     part: q.part,
     answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: sanitizeRichText(a.bodyHtml, PUBLIC) })),

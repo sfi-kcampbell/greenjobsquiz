@@ -262,3 +262,11 @@ Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`
 - **Opening details:** on the result, respondents click a runner-up to open its full description and button, and click a job to open its text and "Learn more" link. Printing shows everything opened.
 - **API:** the result payload has `match.subResponses` and `runnersUp[].subResponses`, each a list of `{ group, items: [{ title, descriptionHtml, url }] }`.
 - **Runner-up details in the API:** `runnersUp[]` also carries `bodyHtml`, `ctaUrl` and `ctaLabel`, which the result page shows when a runner-up is opened.
+
+## Answer layout
+
+- **Answer layout:** each question can show its answers in 1, 2 or 3 columns (question card → **Answer layout**). The default is 1.
+- **Screen sizes:** phones always show one column. Two columns start at 640px wide, and three at 768px.
+- **Publishing:** the setting is versioned like the rest of a question.
+- **API:** public questions include `columns`.
+

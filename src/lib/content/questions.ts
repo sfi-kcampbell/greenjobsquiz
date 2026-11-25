@@ -30,6 +30,7 @@ export type QuestionView = {
   required: boolean;
   splitMulti: boolean;
   part: QuestionPart;
+  columns: number;
   position: number;
   answers: AnswerView[];
 };
@@ -82,6 +83,7 @@ export async function listQuestions(db: Executor, quizId: number): Promise<Quest
     required: q.required,
     splitMulti: q.splitMulti,
     part: q.part,
+    columns: q.columns,
     position: q.position,
     answers: answersByQuestion.get(q.id) ?? [],
   }));
@@ -120,6 +122,7 @@ export async function saveQuestion(
       required: input.required,
       splitMulti: input.splitMulti,
       part: input.part,
+      columns: input.columns,
     };
 
     // 1. The question itself.
