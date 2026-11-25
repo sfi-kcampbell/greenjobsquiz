@@ -100,7 +100,7 @@ export function SubResponses({
           <Heading className={compact ? "font-medium text-muted" : headingLevel === "h4" ? "font-semibold" : "text-lg font-semibold"}>
             {list.group}
           </Heading>
-          <ul className={compact ? "flex flex-wrap gap-x-3 gap-y-1" : "flex flex-col gap-1.5"}>
+          <ul className={compact ? "flex flex-wrap gap-x-3 gap-y-1" : "flex flex-col gap-2"}>
             {list.items.map((item, i) =>
               compact ? (
                 <li key={`${item.title}-${i}`} className="pltq-sub-response">
@@ -117,36 +117,46 @@ export function SubResponses({
   );
 }
 
+/** A job as a full-width bar; one with text or a link opens to show them (chevron on the right). */
 function SubResponseRow({ item, locale }: { item: SubResponseItem; locale: string }) {
   const m = messagesFor(locale);
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const bar = "pltq-sub-response overflow-hidden rounded-lg border border-border bg-surface";
   if (!item.descriptionHtml && !item.url) {
     return (
-      <li className="pltq-sub-response flex gap-1">
-        <span aria-hidden className="inline-block w-4 shrink-0" />
-        <span className="font-medium">{item.title}</span>
+      <li className={bar}>
+        <span className="block px-4 py-2.5 font-medium">{item.title}</span>
       </li>
     );
   }
   return (
-    <li className="pltq-sub-response">
+    <li className={`${bar} ${open ? "border-brand/40" : ""}`}>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
-        className="pltq-sub-response-toggle flex items-baseline gap-1 rounded text-left font-medium text-brand hover:underline"
+        className={`pltq-sub-response-toggle flex w-full items-center gap-3 px-4 py-2.5 text-left font-medium hover:bg-brand/5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${open ? "bg-brand/5" : ""}`}
       >
-        <Chevron open={open} />
-        {item.title}
+        <span className="flex-1">{item.title}</span>
         <span className="sr-only">{m.detailsHint}</span>
+        <svg
+          aria-hidden
+          viewBox="0 0 20 20"
+          className={`pltq-chevron size-5 shrink-0 text-muted motion-safe:transition-transform print:hidden ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
-      <div id={panelId} className={`pltq-sub-response-details ml-5 mt-1 flex-col gap-1 ${open ? "flex" : "hidden print:flex"}`}>
+      <div
+        id={panelId}
+        className={`pltq-sub-response-details flex-col gap-2 border-t border-border px-4 py-3 ${open ? "flex" : "hidden print:flex"}`}
+      >
         <RichHtml html={item.descriptionHtml} className="text-muted" />
         {item.url && (
           <p>
-            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-brand underline underline-offset-4">
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline underline-offset-4">
               {m.learnMore}
               <span className="sr-only">
                 : {item.title}
