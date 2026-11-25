@@ -3,12 +3,12 @@ import type { Database } from "@/lib/db/create";
 import { getResultByShareToken, saveAnswers, submit } from "@/lib/public/sessions";
 import { getPublishedQuiz } from "@/lib/public/structure";
 import { resetTestDb, setupTestDb, teardownTestDb, TEST_DATABASE_URL } from "@/test/db";
-import { createCategory } from "./categories";
+import { createCategory, listCategories } from "./categories";
 import { ContentError } from "./errors";
 import { saveQuestion } from "./questions";
 import { duplicateQuiz, exportQuiz } from "./quiz-file";
 import { createQuiz, setQuizStatus, updateQuizScoring } from "./quizzes";
-import { saveResponseRow } from "./responses";
+import { saveResponseRow, updateResponseDetails } from "./responses";
 import {
   deleteGroup,
   deleteSubResponse,
@@ -20,7 +20,7 @@ import {
   setResponseSubResponses,
 } from "./sub-responses";
 import { saveTranslations, setQuizLanguages } from "./translations";
-import { questionInput, subResponseInput } from "./validation";
+import { questionInput, responseDetailsInput, subResponseInput } from "./validation";
 import { draftChanges, publishVersion, readWorkingContent, restoreToDraft } from "./versions";
 
 describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
@@ -143,6 +143,31 @@ describe.skipIf(!TEST_DATABASE_URL)("content: sub-responses (Postgres)", () => {
     const none = await take();
     expect(none.runnersUp[0].subResponses).toEqual([]);
     expect(none.match!.subResponses[0].items).toHaveLength(3);
+  });
+
+  it("gives runners-up their description and button, sanitized", async () => {
+    await updateResponseDetails(
+      db,
+      quizId,
+      analyst,
+      responseDetailsInput.parse({
+        title: "Analyst",
+        excerpt: "Numbers!",
+        bodyHtml: '<p>Work with <strong>data</strong> <a href="https://example.org/a">here</a></p><script>x</script>',
+        ctaUrl: "https://example.org/analyst",
+        ctaLabel: "Explore",
+        weights: { [(await listCategories(db, quizId)).find((c) => c.name === "Analytical")!.id]: 5 },
+      }),
+    );
+    await publishVersion(db, quizId, "a@example.org");
+    const quiz = (await getPublishedQuiz(db, { id: quizId }))!;
+    const first = await saveAnswers(db, quiz, { tokenHash: null, entries: [{ questionId: q1, answerIds: [a.hike] }] });
+    const result = (await getResultByShareToken(db, (await submit(db, quiz, { tokenHash: first.tokenHash })).shareToken))!;
+    const runner = result.runnersUp[0];
+    expect(runner).toMatchObject({ title: "Analyst", excerpt: "Numbers!", ctaUrl: "https://example.org/analyst", ctaLabel: "Explore" });
+    expect(runner.bodyHtml).toContain("<strong>data</strong>");
+    expect(runner.bodyHtml).toContain('target="_blank"');
+    expect(runner.bodyHtml).not.toContain("script");
   });
 
   it("translates group names and items on the result", async () => {
