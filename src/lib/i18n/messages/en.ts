@@ -76,6 +76,8 @@ export const en = {
   alsoAGoodFit: "Also a good fit",
   yourProfile: "Your profile",
   opensInNewTab: " (opens in a new tab)",
+  learnMore: "Learn more",
+  detailsHint: " (show details)",
   earlierResults: "Your earlier results",
   attemptN: (n: number) => `Attempt ${n}: `,
   noMatch: "No match",

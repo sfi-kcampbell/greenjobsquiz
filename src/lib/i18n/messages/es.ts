@@ -68,6 +68,8 @@ export const es: Messages = {
   alsoAGoodFit: "También encajas con",
   yourProfile: "Tu perfil",
   opensInNewTab: " (se abre en una pestaña nueva)",
+  learnMore: "Más información",
+  detailsHint: " (ver detalles)",
   earlierResults: "Tus resultados anteriores",
   attemptN: (n) => `Intento ${n}: `,
   noMatch: "Sin coincidencia",

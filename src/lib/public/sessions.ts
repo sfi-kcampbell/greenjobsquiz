@@ -542,7 +542,18 @@ export type ResultPayload = {
     subResponses: SubResponseList;
   } | null;
   /** Each with its sub-responses, up to the quiz's limit per group. */
-  runnersUp: { resultId: number; title: string; excerpt: string | null; percent: number; raw: number; subResponses: SubResponseList }[];
+  runnersUp: {
+    resultId: number;
+    title: string;
+    excerpt: string | null;
+    /** The full description and button, shown when a respondent opens the runner-up. */
+    bodyHtml: string | null;
+    ctaUrl: string | null;
+    ctaLabel: string | null;
+    percent: number;
+    raw: number;
+    subResponses: SubResponseList;
+  }[];
   /** Per category; `percent` is the score as a share of the most achievable (0–100). */
   scores: Record<string, { raw: number; normalized: number | null; percent: number; label: string; color: string }>;
 };
@@ -622,6 +633,9 @@ export async function getResultByShareToken(db: Executor, shareToken: string, op
           resultId: r.resultId,
           title: c?.title ?? r.title,
           excerpt: c?.excerpt ?? null,
+          bodyHtml: sanitizeRichText(c?.bodyHtml, { external: true }),
+          ctaUrl: c?.ctaUrl ?? null,
+          ctaLabel: c?.ctaLabel ?? null,
           percent: toPercentage(r.raw),
           raw: r.raw,
           subResponses: latest ? publicSubResponses(subResponsesFor(latest.content, r.resultId, limit)) : [],

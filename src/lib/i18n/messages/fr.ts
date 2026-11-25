@@ -68,6 +68,8 @@ export const fr: Messages = {
   alsoAGoodFit: "Vous correspondez aussi à",
   yourProfile: "Votre profil",
   opensInNewTab: " (s’ouvre dans un nouvel onglet)",
+  learnMore: "En savoir plus",
+  detailsHint: " (voir les détails)",
   earlierResults: "Vos résultats précédents",
   attemptN: (n) => `Tentative ${n} : `,
   noMatch: "Aucune correspondance",

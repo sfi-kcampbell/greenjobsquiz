@@ -259,5 +259,6 @@ Each result's share link has a 1200×630 PNG card at `/quiz-result/{token}/card`
   - The best match lists **all** of its sub-responses.
   - Runners-up list up to **Sub-responses shown for each runner-up, per group** (quiz settings → Scoring).
 - **Publishing and translation:** sub-responses are versioned like other content, and translatable.
+- **Opening details:** on the result, respondents click a runner-up to open its full description and button, and click a job to open its text and "Learn more" link. Printing shows everything opened.
 - **API:** the result payload has `match.subResponses` and `runnersUp[].subResponses`, each a list of `{ group, items: [{ title, descriptionHtml, url }] }`.
-
+- **Runner-up details in the API:** `runnersUp[]` also carries `bodyHtml`, `ctaUrl` and `ctaLabel`, which the result page shows when a runner-up is opened.
