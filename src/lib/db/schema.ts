@@ -201,6 +201,8 @@ export const questions = pgTable(
     type: text().$type<"single" | "multi">().notNull().default("single"),
     minSelect: smallint().notNull().default(1),
     maxSelect: smallint().notNull().default(1),
+    /** How many columns the answers are shown in (1–3; phones always show one). */
+    columns: smallint().notNull().default(1),
     required: boolean().notNull().default(true),
     splitMulti: boolean().notNull().default(false),
     imageUrl: text(),
@@ -212,6 +214,7 @@ export const questions = pgTable(
   (t) => [
     index("questions_quiz_position").on(t.quizId, t.position),
     check("questions_part_valid", sql`${t.part} in ('pre', 'scored', 'post')`),
+    check("questions_columns_range", sql`${t.columns} between 1 and 3`),
   ],
 );
 

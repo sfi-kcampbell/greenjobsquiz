@@ -6,7 +6,11 @@ import { resetTestDb, setupTestDb, teardownTestDb, TEST_DATABASE_URL } from "@/t
 import { createCategory } from "./categories";
 import { ContentError } from "./errors";
 import { deleteQuestion, listQuestions, reorderQuestions, saveQuestion } from "./questions";
-import { createQuiz, getQuiz } from "./quizzes";
+import { duplicateQuiz, exportQuiz } from "./quiz-file";
+import { createQuiz, getQuiz, setQuizStatus } from "./quizzes";
+import { saveResponseRow } from "./responses";
+import { draftChanges, getVersion, publishVersion, restoreToDraft } from "./versions";
+import { getPublishedQuiz } from "@/lib/public/structure";
 import { MAX_ANSWERS, MAX_QUESTIONS, questionInput, type QuestionInput } from "./validation";
 
 async function expectContentError(promise: Promise<unknown>, code: ContentError["code"]) {
@@ -188,5 +192,35 @@ describe.skipIf(!TEST_DATABASE_URL)("content: questions (Postgres)", () => {
     expect(question.answers).toHaveLength(MAX_ANSWERS);
     expect(question.maxSelect).toBe(MAX_ANSWERS);
     expect(() => q({ type: "multi", maxSelect: MAX_ANSWERS, answers: answers(MAX_ANSWERS + 1) })).toThrow(/at most 25 answers/);
+  });
+
+  it("keeps a question's answer layout through saving, publishing, restore and copies", async () => {
+    const { questionId } = await saveQuestion(db, quizId, q());
+    await saveResponseRow(db, quizId, { id: null, title: "Ranger", weights: { [outdoors]: 5 } });
+    await setQuizStatus(db, quizId, "published");
+    await publishVersion(db, quizId, "a@example.org");
+    expect((await listQuestions(db, quizId))[0].columns).toBe(1);
+    expect((await getPublishedQuiz(db, { id: quizId }))!.questions[0].columns).toBe(1);
+
+    const [current] = await listQuestions(db, quizId);
+    await saveQuestion(
+      db,
+      quizId,
+      q({ id: questionId, columns: 3, answers: current.answers.map((a, i) => ({ key: `k${i}`, id: a.id, label: a.label, bodyHtml: a.bodyHtml, weights: a.weights })) }),
+    );
+    expect((await listQuestions(db, quizId))[0].columns).toBe(3);
+    // A draft until published.
+    expect((await draftChanges(db, quizId))!.changes).toEqual(["Edited question 1 “Rainy day?”"]);
+    expect((await getPublishedQuiz(db, { id: quizId }))!.questions[0].columns).toBe(1);
+    await publishVersion(db, quizId, "a@example.org");
+    expect((await getPublishedQuiz(db, { id: quizId }))!.questions[0].columns).toBe(3);
+    expect((await getVersion(db, quizId, 1))!.content.questions[0].columns).toBe(1);
+
+    expect((await exportQuiz(db, quizId)).questions[0].columns).toBe(3);
+    const copy = await duplicateQuiz(db, quizId, "a@example.org");
+    expect((await listQuestions(db, copy))[0].columns).toBe(3);
+
+    await restoreToDraft(db, quizId, 1);
+    expect((await listQuestions(db, quizId))[0].columns).toBe(1);
   });
 });

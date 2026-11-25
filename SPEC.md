@@ -698,6 +698,14 @@ allowed origins in Settings, and the default allows all.
 
 ---
 
+### Answer layout
+
+- **The setting:** `questions.columns` (1–3, default 1) is how many columns a question's answers are
+  shown in.
+- **Screen sizes:** phones always show one column; the grid steps up at 640px and 768px wide.
+- **Order:** answers run row by row, so the reading and tab order match the screen.
+- **Versioning:** the setting is versioned with the question, and public questions include `columns`.
+
 ### Sub-responses
 
 - **Tables:**

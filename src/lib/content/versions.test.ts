@@ -10,8 +10,8 @@ const base: QuizContent = {
     { id: 2, name: "Analytical", abbr: "ANLY", color: "#2f6690", importance: 1, position: 1 },
   ],
   questions: [
-    { id: 10, title: "Weekend?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, part: "scored", position: 0, answers: [{ id: 100, label: "Hike", bodyHtml: null, position: 0, weights: { "1": 3 } }] },
-    { id: 11, title: "Tools?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, part: "scored", position: 1, answers: [{ id: 110, label: "Saw", bodyHtml: null, position: 0, weights: { "1": 2 } }] },
+    { id: 10, title: "Weekend?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, columns: 1, part: "scored", position: 0, answers: [{ id: 100, label: "Hike", bodyHtml: null, position: 0, weights: { "1": 3 } }] },
+    { id: 11, title: "Tools?", helpHtml: null, type: "single", minSelect: 1, maxSelect: 1, required: true, splitMulti: false, columns: 1, part: "scored", position: 1, answers: [{ id: 110, label: "Saw", bodyHtml: null, position: 0, weights: { "1": 2 } }] },
   ],
   responses: [{ id: 50, title: "Forester", excerpt: null, bodyHtml: "", ctaUrl: null, ctaLabel: null, position: 0, weights: { "1": 5 }, subResponseIds: [] }],
   groups: [],
@@ -49,6 +49,14 @@ describe("diffContent", () => {
     const reordered = structuredClone(base);
     reordered.questions.reverse();
     expect(diffContent(base, reordered)).toEqual(["Reordered questions"]);
+  });
+});
+
+describe("diffContent: answer layout", () => {
+  it("counts a column change as an edit, and older versions read as one column", () => {
+    const next = structuredClone(base);
+    next.questions[0].columns = 3;
+    expect(diffContent(base, next)).toEqual(["Edited question 1 “Weekend?”"]);
   });
 });
 

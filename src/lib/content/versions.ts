@@ -63,6 +63,8 @@ export type QuizContent = {
     maxSelect: number;
     required: boolean;
     splitMulti: boolean;
+    /** Answers shown in this many columns (older versions: 1). */
+    columns: number;
     /** Only "scored" questions count towards the result (versions from before this field: scored). */
     part: QuestionPart;
     position: number;
@@ -125,6 +127,7 @@ export async function readWorkingContent(db: Executor, quizId: number): Promise<
       maxSelect: q.maxSelect,
       required: q.required,
       splitMulti: q.splitMulti,
+      columns: q.columns,
       part: q.part,
       position: q.position,
       answers: q.answers.map((a) => ({ id: a.id, label: a.label, bodyHtml: a.bodyHtml, position: a.position, weights: strKeys(a.weights) })),
@@ -250,7 +253,8 @@ export function diffContent(from: QuizContent, to: QuizContent): string[] {
       old.minSelect !== q.minSelect ||
       old.maxSelect !== q.maxSelect ||
       old.required !== q.required ||
-      old.splitMulti !== q.splitMulti;
+      old.splitMulti !== q.splitMulti ||
+      old.columns !== q.columns;
     if (old.part !== q.part) out.push(`Moved ${label} to ${PART_NAMES[q.part]}`);
     const oa = byId(old.answers);
     const ta = byId(q.answers);
@@ -333,7 +337,7 @@ function asVersion(row: typeof quizVersions.$inferSelect): VersionRow {
     content: {
       ...content,
       scoring: { ...content.scoring, subResponseLimit: content.scoring.subResponseLimit ?? 3 },
-      questions: content.questions.map((q) => ({ ...q, part: q.part ?? "scored" })),
+      questions: content.questions.map((q) => ({ ...q, part: q.part ?? "scored", columns: q.columns ?? 1 })),
       responses: content.responses.map((r) => ({ ...r, subResponseIds: r.subResponseIds ?? [] })),
       groups: content.groups ?? [],
       subResponses: content.subResponses ?? [],
@@ -500,6 +504,7 @@ export async function restoreToDraft(db: Database, quizId: number, number: numbe
         maxSelect: q.maxSelect,
         required: q.required,
         splitMulti: q.splitMulti,
+        columns: q.columns,
         part: q.part,
         position: q.position,
         archivedAt: null,

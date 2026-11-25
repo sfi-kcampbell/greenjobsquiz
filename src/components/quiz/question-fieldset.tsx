@@ -5,6 +5,13 @@ import type { PublicQuestion } from "@/lib/public/structure";
 import { RichHtml } from "./rich-html";
 import { useMessages } from "./i18n";
 
+/** Phones always get one column; 2 from 640px wide, 3 from 768px. */
+const COLUMN_CLASSES: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-1 sm:grid-cols-2 print:grid-cols-2",
+  3: "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 print:grid-cols-3",
+};
+
 /**
  * One question's fieldset: legend with its number, help, native radios or
  * checkboxes with plain-text labels (rich details outside them), and the
@@ -76,7 +83,8 @@ export function QuestionFieldset({
           </p>
         )}
 
-        <div className="flex flex-col gap-3">
+        {/* Answers flow row by row, so the reading and tab order match what's on screen. */}
+        <div className={`pltq-answers grid gap-3 ${COLUMN_CLASSES[question.columns] ?? COLUMN_CLASSES[1]}`}>
           {question.answers.map((answer, i) => {
             const inputId = `${uid}-a${answer.id}`;
             const detailsId = `${inputId}-details`;

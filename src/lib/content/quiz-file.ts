@@ -125,6 +125,8 @@ const fileSchema = z
           maxSelect: z.number().int().min(1).max(MAX_ANSWERS),
           required: z.boolean(),
           splitMulti: z.boolean(),
+          /** Older files: one column. */
+          columns: z.number().int().min(1).max(3).default(1),
           /** Older files have no part: their questions are scored. */
           part: z.enum(["pre", "scored", "post"]).default("scored"),
           answers: z
@@ -323,6 +325,7 @@ export async function exportQuiz(db: Executor, quizId: number): Promise<QuizFile
       maxSelect: q.maxSelect,
       required: q.required,
       splitMulti: q.splitMulti,
+      columns: q.columns,
       part: q.part,
       answers: ans
         .filter((a) => a.questionId === q.id)
@@ -518,6 +521,7 @@ export async function importQuiz(
           maxSelect: single ? 1 : q.maxSelect,
           required: q.required,
           splitMulti: single || q.part !== "scored" ? false : q.splitMulti,
+          columns: q.columns,
           part: q.part,
           position: i,
         })
